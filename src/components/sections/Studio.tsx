@@ -92,7 +92,7 @@ export function Studio() {
           <h2 className="font-display text-3xl md:text-4xl">Live from the studio</h2>
         </div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 grid-rows-[repeat(4,minmax(120px,1fr))] gap-3 auto-rows-[140px]">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 auto-rows-[44vw] sm:auto-rows-[180px] md:auto-rows-[160px]">
         {items.map((g, i) => (
           <motion.button
             key={i}
