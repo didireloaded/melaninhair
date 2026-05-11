@@ -357,15 +357,41 @@ function BookPage() {
 
             {step === 2 && (
               <>
-                <h1 className="font-display text-3xl md:text-4xl">A few details.</h1>
-                <p className="text-xs text-muted-foreground mt-2">Optional — but helpful.</p>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={5}
-                  placeholder="Any inspirations, sensitivities, or special requests…"
-                  className="mt-6 w-full bg-card rounded-2xl p-4 text-sm outline-none border border-border/50 focus:border-gold/40 transition-colors resize-none"
-                />
+                <h1 className="font-display text-3xl md:text-4xl">Your details.</h1>
+                <p className="text-xs text-muted-foreground mt-2">So Hermine can reach you on WhatsApp.</p>
+
+                <div className="mt-6 space-y-3">
+                  <div className="relative">
+                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                      placeholder="Full name"
+                      autoComplete="name"
+                      className="w-full bg-card rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none border border-border/50 focus:border-gold/40 transition-colors"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <input
+                      type="tel"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      placeholder="WhatsApp number (e.g. +264 81 …)"
+                      autoComplete="tel"
+                      inputMode="tel"
+                      className="w-full bg-card rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none border border-border/50 focus:border-gold/40 transition-colors"
+                    />
+                  </div>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={4}
+                    placeholder="Inspirations, sensitivities, or special requests… (optional)"
+                    className="w-full bg-card rounded-2xl p-4 text-sm outline-none border border-border/50 focus:border-gold/40 transition-colors resize-none"
+                  />
+                </div>
               </>
             )}
 
@@ -380,6 +406,8 @@ function BookPage() {
                     value={date ? new Date(date + "T00:00:00").toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric" }) : "—"}
                   />
                   <Row label="Time" value={time ?? "—"} />
+                  <Row label="Name" value={contactName || "—"} />
+                  <Row label="Phone" value={contactPhone || "—"} />
                   {notes && <Row label="Notes" value={notes} />}
                   <div className="border-t border-border/50 pt-3 flex justify-between">
                     <span className="text-sm">Total</span>
