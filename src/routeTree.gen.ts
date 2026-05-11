@@ -17,6 +17,7 @@ import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as BookRouteImport } from './routes/book'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BookingBookingIdRouteImport } from './routes/booking.$bookingId'
 import { Route as ApiInstagramRouteImport } from './routes/api/instagram'
 
 const ProfileRoute = ProfileRouteImport.update({
@@ -59,6 +60,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BookingBookingIdRoute = BookingBookingIdRouteImport.update({
+  id: '/booking/$bookingId',
+  path: '/booking/$bookingId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiInstagramRoute = ApiInstagramRouteImport.update({
   id: '/api/instagram',
   path: '/api/instagram',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof NotificationsRoute
   '/profile': typeof ProfileRoute
   '/api/instagram': typeof ApiInstagramRoute
+  '/booking/$bookingId': typeof BookingBookingIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/notifications': typeof NotificationsRoute
   '/profile': typeof ProfileRoute
   '/api/instagram': typeof ApiInstagramRoute
+  '/booking/$bookingId': typeof BookingBookingIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/notifications': typeof NotificationsRoute
   '/profile': typeof ProfileRoute
   '/api/instagram': typeof ApiInstagramRoute
+  '/booking/$bookingId': typeof BookingBookingIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/profile'
     | '/api/instagram'
+    | '/booking/$bookingId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/profile'
     | '/api/instagram'
+    | '/booking/$bookingId'
   id:
     | '__root__'
     | '/'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/profile'
     | '/api/instagram'
+    | '/booking/$bookingId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +157,7 @@ export interface RootRouteChildren {
   NotificationsRoute: typeof NotificationsRoute
   ProfileRoute: typeof ProfileRoute
   ApiInstagramRoute: typeof ApiInstagramRoute
+  BookingBookingIdRoute: typeof BookingBookingIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -205,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/booking/$bookingId': {
+      id: '/booking/$bookingId'
+      path: '/booking/$bookingId'
+      fullPath: '/booking/$bookingId'
+      preLoaderRoute: typeof BookingBookingIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/instagram': {
       id: '/api/instagram'
       path: '/api/instagram'
@@ -225,6 +245,7 @@ const rootRouteChildren: RootRouteChildren = {
   NotificationsRoute: NotificationsRoute,
   ProfileRoute: ProfileRoute,
   ApiInstagramRoute: ApiInstagramRoute,
+  BookingBookingIdRoute: BookingBookingIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
