@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, BellOff, CheckCheck, ChevronLeft, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -137,9 +137,9 @@ function NotificationsPage() {
                 return (
                   <li key={n.id}>
                     {n.link ? (
-                      <Link to={n.link as string} className="block">
+                      <a href={n.link} className="block">
                         {Item}
-                      </Link>
+                      </a>
                     ) : (
                       Item
                     )}
