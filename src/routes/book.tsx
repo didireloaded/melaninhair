@@ -1,46 +1,202 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Check, Upload, Calendar as Cal, Clock, Sparkles } from "lucide-react";
+import { ChevronLeft, Check, Calendar as Cal, Clock, Sparkles, Loader2 } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { BottomNav } from "@/components/BottomNav";
-import s1 from "@/assets/style-1.jpg";
-import s2 from "@/assets/style-2.jpg";
-import s3 from "@/assets/style-3.jpg";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/book")({
   head: () => ({ meta: [{ title: "Book Your Session — Melanin Hair" }] }),
   component: BookPage,
 });
 
-const styles = [
-  { img: s1, title: "Silk Press", price: "N$650", duration: "2h" },
-  { img: s2, title: "Knotless", price: "N$1,200", duration: "5h" },
-  { img: s3, title: "Naturals", price: "N$450", duration: "1.5h" },
-];
-const days = Array.from({ length: 7 }, (_, i) => {
-  const d = new Date();
-  d.setDate(d.getDate() + i);
-  return d;
-});
-const times = ["09:00", "11:00", "13:00", "15:00", "17:00"];
+type Style = {
+  id: string;
+  title: string;
+  description: string | null;
+  price_cents: number | null;
+  duration_minutes: number | null;
+};
+
+const SLOTS = ["09:00", "11:00", "13:00", "15:00", "17:00"];
+// Mon–Sat (closed Sundays).
+const isOpenDay = (d: Date) => d.getDay() !== 0;
+
+const fmtPrice = (c: number | null) =>
+  c == null ? "—" : `N$${(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+const fmtDuration = (m: number | null) =>
+  m == null ? "" : m >= 60 ? `${Math.round((m / 60) * 10) / 10}h` : `${m}m`;
+const ymd = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
 
 function BookPage() {
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+
   const [step, setStep] = useState(0);
-  const [style, setStyle] = useState<number | null>(null);
-  const [day, setDay] = useState<number | null>(null);
+  const [styles, setStyles] = useState<Style[]>([]);
+  const [styleId, setStyleId] = useState<string | null>(null);
+  const [date, setDate] = useState<string | null>(null); // yyyy-mm-dd
   const [time, setTime] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // availability: { 'yyyy-mm-dd': Set<'HH:MM' | '*'> } — '*' means full day blocked
+  const [blocks, setBlocks] = useState<Record<string, Set<string>>>({});
+  // existing bookings to prevent double-booking
+  const [taken, setTaken] = useState<Record<string, Set<string>>>({});
+
+  // 14-day horizon
+  const horizon = useMemo(() => {
+    const out: Date[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      out.push(d);
+    }
+    return out;
+  }, []);
+
+  // Load styles + availability + existing bookings
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const startDate = ymd(horizon[0]);
+      const endDate = ymd(horizon[horizon.length - 1]);
+
+      const [stylesRes, blocksRes, bookingsRes] = await Promise.all([
+        supabase.from("styles").select("id,title,description,price_cents,duration_minutes")
+          .eq("is_active", true).order("sort_order", { ascending: true }),
+        supabase.from("availability_blocks").select("blocked_date,blocked_time")
+          .gte("blocked_date", startDate).lte("blocked_date", endDate),
+        supabase.from("bookings").select("booking_date,booking_time,status")
+          .gte("booking_date", startDate).lte("booking_date", endDate)
+          .in("status", ["pending", "confirmed"]),
+      ]);
+
+      if (cancelled) return;
+      if (stylesRes.data) setStyles(stylesRes.data as Style[]);
+
+      const b: Record<string, Set<string>> = {};
+      for (const row of blocksRes.data ?? []) {
+        const k = row.blocked_date as string;
+        if (!b[k]) b[k] = new Set();
+        b[k].add(row.blocked_time ?? "*");
+      }
+      setBlocks(b);
+
+      const t: Record<string, Set<string>> = {};
+      for (const row of bookingsRes.data ?? []) {
+        const k = row.booking_date as string;
+        if (!t[k]) t[k] = new Set();
+        t[k].add(row.booking_time as string);
+      }
+      setTaken(t);
+    })();
+    return () => { cancelled = true; };
+  }, [horizon]);
+
+  // Is a date selectable?
+  const dateUnavailable = (d: Date) => {
+    if (!isOpenDay(d)) return true;
+    const k = ymd(d);
+    const blocked = blocks[k];
+    if (blocked?.has("*")) return true;
+    // All slots gone (blocked + booked combined)?
+    const used = new Set<string>([
+      ...Array.from(blocked ?? []).filter((s) => s !== "*"),
+      ...Array.from(taken[k] ?? []),
+    ]);
+    // Also consider past times for today
+    const now = new Date();
+    if (ymd(now) === k) {
+      for (const slot of SLOTS) {
+        const [h, m] = slot.split(":").map(Number);
+        const slotDate = new Date(d);
+        slotDate.setHours(h, m, 0, 0);
+        if (slotDate.getTime() <= now.getTime()) used.add(slot);
+      }
+    }
+    return SLOTS.every((s) => used.has(s));
+  };
+
+  const slotUnavailable = (d: string, t: string) => {
+    if (blocks[d]?.has("*")) return true;
+    if (blocks[d]?.has(t)) return true;
+    if (taken[d]?.has(t)) return true;
+    const today = ymd(new Date());
+    if (d === today) {
+      const [h, m] = t.split(":").map(Number);
+      const slotDate = new Date();
+      slotDate.setHours(h, m, 0, 0);
+      if (slotDate.getTime() <= Date.now()) return true;
+    }
+    return false;
+  };
 
   const next = () => setStep((s) => Math.min(s + 1, 3));
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
   const canNext =
-    (step === 0 && style !== null) ||
-    (step === 1 && day !== null && time !== null) ||
+    (step === 0 && styleId !== null) ||
+    (step === 1 && date !== null && time !== null) ||
     step === 2 ||
     step === 3;
+
+  const selectedStyle = styles.find((s) => s.id === styleId) ?? null;
+
+  const confirm = async () => {
+    if (!user) {
+      toast.info("Please sign in to confirm your booking");
+      navigate({ to: "/login", search: { redirect: "/book" } });
+      return;
+    }
+    if (!styleId || !date || !time || !selectedStyle) return;
+    setSubmitting(true);
+    try {
+      // Re-check the slot at submit time (someone may have grabbed it)
+      const { data: clash } = await supabase
+        .from("bookings")
+        .select("id")
+        .eq("booking_date", date)
+        .eq("booking_time", time)
+        .in("status", ["pending", "confirmed"])
+        .limit(1);
+      if (clash && clash.length > 0) {
+        toast.error("That slot was just taken — please pick another time.");
+        setSubmitting(false);
+        setStep(1);
+        return;
+      }
+      const { error } = await supabase.from("bookings").insert({
+        user_id: user.id,
+        style_id: styleId,
+        style_title: selectedStyle.title,
+        price_cents: selectedStyle.price_cents,
+        booking_date: date,
+        booking_time: time,
+        notes: notes || null,
+        status: "pending",
+      });
+      if (error) throw error;
+      toast.success("Booking sent — you'll get a confirmation soon.");
+      setDone(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save booking");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -62,96 +218,112 @@ function BookPage() {
         </div>
 
         <div className="h-1 w-full bg-secondary rounded-full overflow-hidden mb-8">
-          <motion.div
-            animate={{ width: `${((step + 1) / 4) * 100}%` }}
-            className="h-full bg-gradient-gold"
-          />
+          <motion.div animate={{ width: `${((step + 1) / 4) * 100}%` }} className="h-full bg-gradient-gold" />
         </div>
 
         <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.25 }}
-          >
+          <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
             {step === 0 && (
               <>
                 <h1 className="font-display text-3xl md:text-4xl">Pick your look.</h1>
                 <p className="text-xs text-muted-foreground mt-2">Choose the style you'd love this time.</p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6">
-                  {styles.map((s, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setStyle(i)}
-                      className={`relative text-left rounded-3xl overflow-hidden transition-all ${
-                        style === i ? "ring-2 ring-gold" : ""
-                      }`}
-                    >
-                      <div className="aspect-[5/3] md:aspect-[3/4] overflow-hidden">
-                        <img src={s.img} alt={s.title} className="size-full object-cover" />
-                      </div>
-                      <div className="p-4 bg-card flex justify-between items-end">
-                        <div>
-                          <p className="font-display text-lg leading-tight">{s.title}</p>
-                          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <Clock className="size-3" /> {s.duration}
+                {styles.length === 0 ? (
+                  <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" /> Loading services…
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
+                    {styles.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => setStyleId(s.id)}
+                        className={`relative text-left rounded-3xl overflow-hidden transition-all bg-card p-5 ${
+                          styleId === s.id ? "ring-2 ring-gold" : "border border-border/50"
+                        }`}
+                      >
+                        <p className="font-display text-xl leading-tight">{s.title}</p>
+                        {s.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{s.description}</p>
+                        )}
+                        <div className="mt-3 flex items-center justify-between">
+                          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                            <Clock className="size-3" /> {fmtDuration(s.duration_minutes)}
                           </p>
+                          <p className="text-sm text-gold">{fmtPrice(s.price_cents)}</p>
                         </div>
-                        <p className="text-sm text-gold">{s.price}</p>
-                      </div>
-                      {style === i && (
-                        <div className="absolute top-3 right-3 size-7 rounded-full bg-gradient-gold flex items-center justify-center">
-                          <Check className="size-4 text-primary-foreground" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
+                        {styleId === s.id && (
+                          <div className="absolute top-3 right-3 size-7 rounded-full bg-gradient-gold flex items-center justify-center">
+                            <Check className="size-4 text-primary-foreground" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </>
             )}
 
             {step === 1 && (
               <>
                 <h1 className="font-display text-3xl md:text-4xl">When works?</h1>
-                <p className="text-xs text-muted-foreground mt-2">Pick a day & time that feels right.</p>
+                <p className="text-xs text-muted-foreground mt-2">Pick a day & time. Greyed-out dates aren't available.</p>
                 <p className="text-[11px] uppercase tracking-widest text-gold/80 mt-6 mb-3 flex items-center gap-1.5">
-                  <Cal className="size-3" /> Date
+                  <Cal className="size-3" /> Date · next 14 days
                 </p>
-                <div className="-mx-5 px-5 flex gap-2 overflow-x-auto scrollbar-hide">
-                  {days.map((d, i) => {
-                    const sel = day === i;
+                <div className="-mx-5 px-5 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                  {horizon.map((d, i) => {
+                    const k = ymd(d);
+                    const off = dateUnavailable(d);
+                    const sel = date === k;
                     return (
                       <button
                         key={i}
-                        onClick={() => setDay(i)}
+                        onClick={() => {
+                          if (off) return;
+                          setDate(k);
+                          setTime(null);
+                        }}
+                        disabled={off}
                         className={`shrink-0 w-16 py-3 rounded-2xl text-center transition-all ${
-                          sel ? "bg-gradient-gold text-primary-foreground" : "glass-light"
+                          sel ? "bg-gradient-gold text-primary-foreground"
+                          : off ? "bg-secondary/40 text-muted-foreground/40 line-through cursor-not-allowed"
+                          : "glass-light"
                         }`}
                       >
                         <p className="text-[10px] uppercase">{d.toLocaleDateString("en", { weekday: "short" })}</p>
                         <p className="font-display text-xl mt-0.5">{d.getDate()}</p>
+                        <p className="text-[9px] uppercase mt-0.5 opacity-70">{d.toLocaleDateString("en", { month: "short" })}</p>
                       </button>
                     );
                   })}
                 </div>
-                <p className="text-[11px] uppercase tracking-widest text-gold/80 mt-7 mb-3 flex items-center gap-1.5">
-                  <Clock className="size-3" /> Time
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {times.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setTime(t)}
-                      className={`py-3 rounded-2xl text-sm transition-all ${
-                        time === t ? "bg-gradient-gold text-primary-foreground" : "glass-light"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                {date && (
+                  <>
+                    <p className="text-[11px] uppercase tracking-widest text-gold/80 mt-7 mb-3 flex items-center gap-1.5">
+                      <Clock className="size-3" /> Time
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {SLOTS.map((t) => {
+                        const off = slotUnavailable(date, t);
+                        const sel = time === t;
+                        return (
+                          <button
+                            key={t}
+                            onClick={() => !off && setTime(t)}
+                            disabled={off}
+                            className={`py-3 rounded-2xl text-sm transition-all ${
+                              sel ? "bg-gradient-gold text-primary-foreground"
+                              : off ? "bg-secondary/40 text-muted-foreground/40 line-through cursor-not-allowed"
+                              : "glass-light"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </>
             )}
 
@@ -166,58 +338,51 @@ function BookPage() {
                   placeholder="Any inspirations, sensitivities, or special requests…"
                   className="mt-6 w-full bg-card rounded-2xl p-4 text-sm outline-none border border-border/50 focus:border-gold/40 transition-colors resize-none"
                 />
-                <label className="mt-3 flex items-center gap-3 p-4 rounded-2xl glass-light cursor-pointer">
-                  <div className="size-10 rounded-xl bg-gradient-gold flex items-center justify-center">
-                    <Upload className="size-4 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Add inspiration photo</p>
-                    <p className="text-[11px] text-muted-foreground">Send a vibe to match</p>
-                  </div>
-                  <input type="file" accept="image/*" className="hidden" />
-                </label>
               </>
             )}
 
             {step === 3 && !done && (
               <>
                 <h1 className="font-display text-3xl md:text-4xl">All set.</h1>
-                <p className="text-xs text-muted-foreground mt-2">Confirm your booking.</p>
+                <p className="text-xs text-muted-foreground mt-2">Review and confirm your booking.</p>
                 <div className="mt-6 rounded-3xl bg-card p-5 space-y-3 border border-border/50">
-                  <Row label="Style" value={style !== null ? styles[style].title : "—"} />
+                  <Row label="Style" value={selectedStyle?.title ?? "—"} />
                   <Row
                     label="Date"
-                    value={
-                      day !== null
-                        ? days[day].toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric" })
-                        : "—"
-                    }
+                    value={date ? new Date(date + "T00:00:00").toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric" }) : "—"}
                   />
                   <Row label="Time" value={time ?? "—"} />
+                  {notes && <Row label="Notes" value={notes} />}
                   <div className="border-t border-border/50 pt-3 flex justify-between">
                     <span className="text-sm">Total</span>
-                    <span className="text-sm text-gold">{style !== null ? styles[style].price : "—"}</span>
+                    <span className="text-sm text-gold">{fmtPrice(selectedStyle?.price_cents ?? null)}</span>
                   </div>
                 </div>
+                {!authLoading && !user && (
+                  <p className="mt-4 text-xs text-muted-foreground text-center">
+                    You'll be asked to sign in to confirm.
+                  </p>
+                )}
               </>
             )}
 
             {done && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-center pt-12"
-              >
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center pt-12">
                 <div className="size-20 rounded-full bg-gradient-gold mx-auto flex items-center justify-center shadow-[var(--shadow-glow)]">
                   <Sparkles className="size-8 text-primary-foreground" />
                 </div>
                 <h2 className="font-display text-3xl mt-6">You're booked, love.</h2>
                 <p className="text-sm text-muted-foreground mt-3 max-w-xs mx-auto">
-                  I'll message you on WhatsApp shortly to confirm everything ✨
+                  Your request is in — you'll get a confirmation once Melanin reviews it. Track it in your profile.
                 </p>
-                <Link to="/" className="mt-8 inline-block px-6 py-3 rounded-full bg-gradient-gold text-primary-foreground text-sm">
-                  Back home
-                </Link>
+                <div className="mt-8 flex gap-2 justify-center">
+                  <Link to="/profile" className="px-6 py-3 rounded-full bg-gradient-gold text-primary-foreground text-sm">
+                    View bookings
+                  </Link>
+                  <Link to="/" className="px-6 py-3 rounded-full glass-light text-sm">
+                    Back home
+                  </Link>
+                </div>
               </motion.div>
             )}
           </motion.div>
@@ -228,10 +393,11 @@ function BookPage() {
         <div className="fixed bottom-24 inset-x-0 px-5 z-30">
           <div className="mx-auto max-w-md">
             <button
-              onClick={step === 3 ? () => setDone(true) : next}
-              disabled={!canNext}
-              className="w-full h-14 rounded-full bg-gradient-gold text-primary-foreground font-medium shadow-[var(--shadow-glow)] disabled:opacity-40 transition-opacity"
+              onClick={step === 3 ? confirm : next}
+              disabled={!canNext || submitting}
+              className="w-full h-14 rounded-full bg-gradient-gold text-primary-foreground font-medium shadow-[var(--shadow-glow)] disabled:opacity-40 transition-opacity flex items-center justify-center gap-2"
             >
+              {submitting && <Loader2 className="size-4 animate-spin" />}
               {step === 3 ? "Confirm Booking" : "Continue"}
             </button>
           </div>
@@ -245,9 +411,9 @@ function BookPage() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span>{value}</span>
+    <div className="flex justify-between gap-4 text-sm">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="text-right">{value}</span>
     </div>
   );
 }
