@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Heart, Instagram, ExternalLink } from "lucide-react";
+import { X, Heart, Instagram, ExternalLink, Play, Volume2, VolumeX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import g1 from "@/assets/g1.jpg";
 import g2 from "@/assets/g2.jpg";
@@ -10,19 +10,21 @@ import s2 from "@/assets/style-2.jpg";
 import s3 from "@/assets/style-3.jpg";
 
 type Item = {
-  src: string;
+  src: string;          // poster / thumbnail (always an image URL)
+  videoSrc?: string;    // present for reels/videos
+  mediaType: "image" | "video";
   caption: string;
   permalink?: string;
   span?: string;
 };
 
 const fallback: Item[] = [
-  { src: g1, span: "row-span-2", caption: "Mirror, mirror — silk press magic" },
-  { src: g2, span: "", caption: "Behind every braid, an hour of love" },
-  { src: g3, span: "", caption: "Gold hour, gold hoops" },
-  { src: s3, span: "row-span-2", caption: "Volume that speaks for itself" },
-  { src: s2, span: "", caption: "Honey-tipped knotless" },
-  { src: g4, span: "", caption: "Studio sessions, all day" },
+  { src: g1, mediaType: "image", span: "row-span-2", caption: "Mirror, mirror — silk press magic" },
+  { src: g2, mediaType: "image", span: "", caption: "Behind every braid, an hour of love" },
+  { src: g3, mediaType: "image", span: "", caption: "Gold hour, gold hoops" },
+  { src: s3, mediaType: "image", span: "row-span-2", caption: "Volume that speaks for itself" },
+  { src: s2, mediaType: "image", span: "", caption: "Honey-tipped knotless" },
+  { src: g4, mediaType: "image", span: "", caption: "Studio sessions, all day" },
 ];
 
 const spans = ["row-span-2", "", "", "row-span-2", "", ""];
@@ -31,28 +33,29 @@ export function Studio() {
   const [active, setActive] = useState<number | null>(null);
   const [items, setItems] = useState<Item[]>(fallback);
   const [source, setSource] = useState<"instagram" | "studio" | "curated">("curated");
-  // Per-tile fallback chain: gallery_items url → curated local image.
   const [galleryFallbacks, setGalleryFallbacks] = useState<string[]>([]);
+  const [muted, setMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Always fetch the curated gallery in parallel — used as a fallback layer
-      // for any individual broken Instagram tile (CDN URLs expire).
       const galleryPromise = supabase
         .from("gallery_items")
         .select("media_url,caption,instagram_permalink")
         .order("sort_order", { ascending: true })
         .limit(12);
 
-      // 1) Try live Instagram (server route already validated reachability).
       try {
         const res = await fetch("/api/instagram");
         const data = await res.json();
         if (!cancelled && Array.isArray(data?.items) && data.items.length) {
           setItems(
             data.items.slice(0, 6).map((n: any, i: number) => ({
-              src: n.media_url,
+              // Always use a still for the tile; videos get a poster from thumbnail_url.
+              src: n.thumbnail_url || n.media_url,
+              videoSrc: n.media_type === "video" ? n.media_url : undefined,
+              mediaType: n.media_type === "video" ? "video" : "image",
               caption: n.caption?.split("\n")[0] || "From the studio",
               permalink: n.permalink,
               span: spans[i] ?? "",
@@ -67,12 +70,12 @@ export function Studio() {
         }
       } catch {}
 
-      // 2) Fall back to admin-curated gallery_items.
       const { data: gallery } = await galleryPromise;
       if (!cancelled && gallery && gallery.length) {
         setItems(
           gallery.slice(0, 6).map((g, i) => ({
             src: g.media_url,
+            mediaType: "image" as const,
             caption: g.caption ?? "From the studio",
             permalink: g.instagram_permalink ?? undefined,
             span: spans[i] ?? "",
@@ -80,16 +83,20 @@ export function Studio() {
         );
         setSource("studio");
       }
-      // 3) Otherwise the initial `fallback` (local images) stays in place.
     })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Per-tile error fallback: try a gallery_items url first, then the curated
-  // local image at the same position. Mutates the img element directly so the
-  // chain only advances on the next failure.
+  // Reset mute state when modal opens; pause video when closed.
+  useEffect(() => {
+    if (active === null) {
+      videoRef.current?.pause();
+      setMuted(true);
+    }
+  }, [active]);
+
   const handleImgError = (i: number) => (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
     const stage = Number(img.dataset.stage ?? "0");
@@ -101,6 +108,8 @@ export function Studio() {
     img.dataset.stage = "2";
     img.src = fallback[i % fallback.length].src;
   };
+
+  const activeItem = active !== null ? items[active] : null;
 
   return (
     <section className="px-5 mt-20">
@@ -138,12 +147,24 @@ export function Studio() {
               className="size-full object-cover transition-transform duration-700 group-hover:scale-110"
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+            {g.mediaType === "video" && (
+              <>
+                <div className="absolute top-2 right-2 glass-light px-1.5 py-0.5 rounded-full text-[10px] tracking-wide flex items-center gap-1">
+                  <Play className="size-2.5 fill-current" /> Reel
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="size-12 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Play className="size-5 fill-white text-white translate-x-0.5" />
+                  </div>
+                </div>
+              </>
+            )}
           </motion.button>
         ))}
       </div>
 
       <AnimatePresence>
-        {active !== null && (
+        {activeItem && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
@@ -166,22 +187,59 @@ export function Studio() {
               >
                 <X className="size-4" />
               </button>
-              <img
-                src={items[active].src}
-                alt=""
-                onError={handleImgError(active)}
-                referrerPolicy="no-referrer"
-                className="w-full aspect-square object-cover"
-              />
+              <div className="relative w-full aspect-square bg-black">
+                {activeItem.mediaType === "video" && activeItem.videoSrc ? (
+                  <>
+                    <video
+                      ref={videoRef}
+                      src={activeItem.videoSrc}
+                      poster={activeItem.src}
+                      autoPlay
+                      loop
+                      muted={muted}
+                      playsInline
+                      controls={false}
+                      crossOrigin="anonymous"
+                      onError={() => {
+                        // Drop to poster image if video fails.
+                        if (videoRef.current) videoRef.current.style.display = "none";
+                      }}
+                      className="absolute inset-0 size-full object-cover"
+                    />
+                    <button
+                      onClick={() => {
+                        const next = !muted;
+                        setMuted(next);
+                        if (videoRef.current) {
+                          videoRef.current.muted = next;
+                          if (!next) videoRef.current.play().catch(() => {});
+                        }
+                      }}
+                      className="absolute bottom-3 right-3 z-10 size-9 rounded-full glass flex items-center justify-center"
+                      aria-label={muted ? "Unmute" : "Mute"}
+                    >
+                      {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+                    </button>
+                  </>
+                ) : (
+                  <img
+                    src={activeItem.src}
+                    alt=""
+                    onError={handleImgError(active!)}
+                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 size-full object-cover"
+                  />
+                )}
+              </div>
               <div className="p-5">
-                <p className="text-sm leading-relaxed line-clamp-4">{items[active].caption}</p>
+                <p className="text-sm leading-relaxed line-clamp-4">{activeItem.caption}</p>
                 <div className="mt-4 flex items-center justify-between">
                   <button className="text-xs text-gold flex items-center gap-1.5">
                     <Heart className="size-3.5" /> Save look
                   </button>
-                  {items[active].permalink ? (
+                  {activeItem.permalink ? (
                     <a
-                      href={items[active].permalink}
+                      href={activeItem.permalink}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs glass-light px-3 py-1.5 rounded-full flex items-center gap-1.5"
