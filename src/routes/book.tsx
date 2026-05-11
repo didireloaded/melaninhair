@@ -1,12 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Check, Calendar as Cal, Clock, Sparkles, Loader2 } from "lucide-react";
+import { ChevronLeft, Check, Calendar as Cal, Clock, Sparkles, Loader2, Phone, User as UserIcon } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { BottomNav } from "@/components/BottomNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { buildWhatsAppLink, requestPushPermission } from "@/lib/notifications";
 
 export const Route = createFileRoute("/book")({
   head: () => ({ meta: [{ title: "Book Your Session — Melanin Hair" }] }),
@@ -46,6 +47,8 @@ function BookPage() {
   const [date, setDate] = useState<string | null>(null); // yyyy-mm-dd
   const [time, setTime] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -147,10 +150,11 @@ function BookPage() {
   const next = () => setStep((s) => Math.min(s + 1, 3));
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
+  const phoneOk = /^[+\d][\d\s()-]{6,}$/.test(contactPhone.trim());
   const canNext =
     (step === 0 && styleId !== null) ||
     (step === 1 && date !== null && time !== null) ||
-    step === 2 ||
+    (step === 2 && contactName.trim().length >= 2 && phoneOk) ||
     step === 3;
 
   const selectedStyle = styles.find((s) => s.id === styleId) ?? null;
