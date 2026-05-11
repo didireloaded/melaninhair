@@ -20,7 +20,7 @@ export function Founder() {
           <div className="p-6 md:p-10 flex flex-col justify-center">
             <p className="text-xs uppercase tracking-[0.2em] text-gold/80 mb-2">Meet your stylist</p>
             <h2 className="font-display text-4xl md:text-5xl leading-[0.95]">
-              Hi, I'm <span className="italic text-gradient-gold">Amara.</span>
+              Hi, I'm <span className="italic text-gradient-gold">Hermine.</span>
             </h2>
             <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
               For seven years I've made hair feel like a love letter — from
