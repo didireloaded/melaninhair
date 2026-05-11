@@ -21,12 +21,12 @@ export const Route = createFileRoute("/explore")({
 
 const cats = ["All", "Braids", "Naturals", "Silk Press", "Wigs", "Color"];
 const all = [
-  { img: s2, title: "Honey Knotless", price: "₦60k" },
-  { img: s1, title: "Glass Bob", price: "₦35k" },
-  { img: s3, title: "Cloud Afro", price: "₦25k" },
-  { img: g1, title: "Mirror Press", price: "₦40k" },
-  { img: g3, title: "Soft Curls", price: "₦28k" },
-  { img: g2, title: "French Braid", price: "₦22k" },
+  { img: s2, title: "Honey Knotless", price: "N$1,200" },
+  { img: s1, title: "Glass Bob", price: "N$650" },
+  { img: s3, title: "Cloud Afro", price: "N$450" },
+  { img: g1, title: "Mirror Press", price: "N$700" },
+  { img: g3, title: "Soft Curls", price: "N$520" },
+  { img: g2, title: "French Braid", price: "N$420" },
 ];
 
 function ExplorePage() {
