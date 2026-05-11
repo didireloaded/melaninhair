@@ -25,7 +25,13 @@ const bookingSchema = z.object({
 });
 
 export const Route = createFileRoute("/book")({
-  head: () => ({ meta: [{ title: "Book Your Session — Melanin Hair" }] }),
+  head: () => ({
+    meta: [
+      { title: "Book Your Session — Melanin Hair" },
+      { name: "description", content: "Reserve your spot with Hermine in seconds. Pick a style, time, and we'll confirm on WhatsApp." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: BookPage,
 });
 
