@@ -36,7 +36,7 @@ export function Footer() {
           </Link>
         </div>
         <div className="mt-7 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-          <MapPin className="size-3" /> Lekki, Lagos · home calls citywide
+          <MapPin className="size-3" /> Ongwediva, Namibia · home calls across town
         </div>
       </div>
       <p className="text-center text-[10px] text-muted-foreground mt-6 tracking-widest uppercase">

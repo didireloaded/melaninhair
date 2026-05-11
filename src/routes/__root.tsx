@@ -74,7 +74,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#0D0D0D" },
       { title: "Melanin Hair — A private hairstyling experience" },
-      { name: "description", content: "Book a private session with Melanin Hair — luxury braids, silk press, naturals & home calls in Lagos." },
+      { name: "description", content: "Book a private session with Melanin Hair — luxury braids, silk press, naturals & home calls in Ongwediva, Namibia." },
       { property: "og:title", content: "Melanin Hair" },
       { property: "og:description", content: "A private hairstyling experience by Melanin Hair." },
       { property: "og:type", content: "website" },
