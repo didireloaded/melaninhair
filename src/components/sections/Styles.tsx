@@ -7,10 +7,10 @@ import s3 from "@/assets/style-3.jpg";
 import g1 from "@/assets/g1.jpg";
 
 const styles = [
-  { img: s1, title: "Silk Press", duration: "2h", price: "₦35k" },
-  { img: s2, title: "Knotless Braids", duration: "5h", price: "₦60k" },
-  { img: s3, title: "Natural Curls", duration: "1.5h", price: "₦25k" },
-  { img: g1, title: "Sleek Ponytail", duration: "1h", price: "₦20k" },
+  { img: s1, title: "Silk Press", duration: "2h", price: "N$650" },
+  { img: s2, title: "Knotless Braids", duration: "5h", price: "N$1,200" },
+  { img: s3, title: "Natural Curls", duration: "1.5h", price: "N$450" },
+  { img: g1, title: "Sleek Ponytail", duration: "1h", price: "N$350" },
 ];
 
 export function Styles() {

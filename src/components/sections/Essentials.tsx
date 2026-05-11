@@ -4,9 +4,9 @@ import p2 from "@/assets/p2.jpg";
 import p3 from "@/assets/p3.jpg";
 
 const products = [
-  { img: p1, name: "Edge Trio", note: "Daily care set", price: "₦18k" },
-  { img: p2, name: "Glow Hair Oil", note: "Cold-pressed", price: "₦12k" },
-  { img: p3, name: "Boar Brush", note: "Hand-finished", price: "₦9k" },
+  { img: p1, name: "Edge Trio", note: "Daily care set", price: "N$320" },
+  { img: p2, name: "Glow Hair Oil", note: "Cold-pressed", price: "N$240" },
+  { img: p3, name: "Boar Brush", note: "Hand-finished", price: "N$180" },
 ];
 
 export function Essentials() {
