@@ -190,10 +190,34 @@ function BookPage() {
         booking_date: date,
         booking_time: time,
         notes: notes || null,
+        contact_name: contactName.trim(),
+        contact_phone: contactPhone.trim(),
         status: "pending",
       });
       if (error) throw error;
-      toast.success("Booking sent — you'll get a confirmation soon.");
+
+      // Build the WhatsApp message for the owner
+      const prettyDate = new Date(date + "T00:00:00").toLocaleDateString("en", {
+        weekday: "long", month: "short", day: "numeric",
+      });
+      const priceLine = selectedStyle.price_cents != null
+        ? `\nPrice: ${fmtPrice(selectedStyle.price_cents)}` : "";
+      const notesLine = notes ? `\nNotes: ${notes}` : "";
+      const message =
+        `Hi Hermine — I just booked on Melanin Hair ✨\n\n` +
+        `Name: ${contactName.trim()}\n` +
+        `Phone: ${contactPhone.trim()}\n` +
+        `Style: ${selectedStyle.title}\n` +
+        `Date: ${prettyDate}\n` +
+        `Time: ${time}` + priceLine + notesLine;
+
+      // Open WhatsApp in a new tab so the owner gets a direct message
+      window.open(buildWhatsAppLink(message), "_blank", "noopener");
+
+      // Politely ask for notification permission so we can ping on confirmation
+      requestPushPermission();
+
+      toast.success("Booking sent — opening WhatsApp to notify Hermine.");
       setDone(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save booking");
