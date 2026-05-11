@@ -8,6 +8,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { buildWhatsAppLink, requestPushPermission } from "@/lib/notifications";
+import { z } from "zod";
+
+const bookingSchema = z.object({
+  styleId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  time: z.string().regex(/^\d{2}:\d{2}$/),
+  contactName: z.string().trim().min(2, "Name must be at least 2 characters").max(80),
+  contactPhone: z
+    .string()
+    .trim()
+    .min(7, "Phone looks too short")
+    .max(20)
+    .regex(/^[+\d][\d\s()-]{6,}$/, "Enter a valid phone number"),
+  notes: z.string().trim().max(500).optional().nullable(),
+});
 
 export const Route = createFileRoute("/book")({
   head: () => ({ meta: [{ title: "Book Your Session — Melanin Hair" }] }),
