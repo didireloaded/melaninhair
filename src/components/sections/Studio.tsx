@@ -31,15 +31,25 @@ export function Studio() {
   const [active, setActive] = useState<number | null>(null);
   const [items, setItems] = useState<Item[]>(fallback);
   const [source, setSource] = useState<"instagram" | "studio" | "curated">("curated");
+  // Per-tile fallback chain: gallery_items url → curated local image.
+  const [galleryFallbacks, setGalleryFallbacks] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // 1) Try live Instagram
+      // Always fetch the curated gallery in parallel — used as a fallback layer
+      // for any individual broken Instagram tile (CDN URLs expire).
+      const galleryPromise = supabase
+        .from("gallery_items")
+        .select("media_url,caption,instagram_permalink")
+        .order("sort_order", { ascending: true })
+        .limit(12);
+
+      // 1) Try live Instagram (server route already validated reachability).
       try {
         const res = await fetch("/api/instagram");
         const data = await res.json();
-        if (!cancelled && data?.items?.length) {
+        if (!cancelled && Array.isArray(data?.items) && data.items.length) {
           setItems(
             data.items.slice(0, 6).map((n: any, i: number) => ({
               src: n.media_url,
@@ -49,19 +59,19 @@ export function Studio() {
             }))
           );
           setSource("instagram");
+          const { data: gallery } = await galleryPromise;
+          if (!cancelled && gallery) {
+            setGalleryFallbacks(gallery.map((g) => g.media_url).filter(Boolean));
+          }
           return;
         }
       } catch {}
 
-      // 2) Fall back to admin-curated gallery_items
-      const { data: gallery } = await supabase
-        .from("gallery_items")
-        .select("media_url,caption,instagram_permalink")
-        .order("sort_order", { ascending: true })
-        .limit(6);
+      // 2) Fall back to admin-curated gallery_items.
+      const { data: gallery } = await galleryPromise;
       if (!cancelled && gallery && gallery.length) {
         setItems(
-          gallery.map((g, i) => ({
+          gallery.slice(0, 6).map((g, i) => ({
             src: g.media_url,
             caption: g.caption ?? "From the studio",
             permalink: g.instagram_permalink ?? undefined,
@@ -70,11 +80,27 @@ export function Studio() {
         );
         setSource("studio");
       }
+      // 3) Otherwise the initial `fallback` (local images) stays in place.
     })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Per-tile error fallback: try a gallery_items url first, then the curated
+  // local image at the same position. Mutates the img element directly so the
+  // chain only advances on the next failure.
+  const handleImgError = (i: number) => (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    const stage = Number(img.dataset.stage ?? "0");
+    if (stage === 0 && galleryFallbacks[i]) {
+      img.dataset.stage = "1";
+      img.src = galleryFallbacks[i];
+      return;
+    }
+    img.dataset.stage = "2";
+    img.src = fallback[i % fallback.length].src;
+  };
 
   return (
     <section className="px-5 mt-20">
@@ -101,9 +127,16 @@ export function Studio() {
             viewport={{ once: true, margin: "-30px" }}
             transition={{ delay: i * 0.05 }}
             onClick={() => setActive(i)}
-            className={`relative rounded-2xl overflow-hidden group ${g.span ?? ""}`}
+            className={`relative rounded-2xl overflow-hidden group bg-secondary/40 ${g.span ?? ""}`}
           >
-            <img src={g.src} alt="" loading="lazy" className="size-full object-cover transition-transform duration-700 group-hover:scale-110" />
+            <img
+              src={g.src}
+              alt=""
+              loading="lazy"
+              onError={handleImgError(i)}
+              referrerPolicy="no-referrer"
+              className="size-full object-cover transition-transform duration-700 group-hover:scale-110"
+            />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
           </motion.button>
         ))}
