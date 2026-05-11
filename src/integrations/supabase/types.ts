@@ -42,6 +42,8 @@ export type Database = {
         Row: {
           booking_date: string
           booking_time: string
+          contact_name: string | null
+          contact_phone: string | null
           created_at: string
           id: string
           inspiration_url: string | null
@@ -56,6 +58,8 @@ export type Database = {
         Insert: {
           booking_date: string
           booking_time: string
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           id?: string
           inspiration_url?: string | null
@@ -70,6 +74,8 @@ export type Database = {
         Update: {
           booking_date?: string
           booking_time?: string
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           id?: string
           inspiration_url?: string | null
@@ -163,6 +169,42 @@ export type Database = {
           media_type?: Database["public"]["Enums"]["media_type"]
           media_url?: string
           sort_order?: number
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          booking_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          link: string | null
+          read: boolean
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          booking_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          link?: string | null
+          read?: boolean
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          booking_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          link?: string | null
+          read?: boolean
+          title?: string
+          user_id?: string
         }
         Relationships: []
       }
