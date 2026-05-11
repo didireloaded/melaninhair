@@ -1,12 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Check, Calendar as Cal, Clock, Sparkles, Loader2 } from "lucide-react";
+import { ChevronLeft, Check, Calendar as Cal, Clock, Sparkles, Loader2, Phone, User as UserIcon } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { BottomNav } from "@/components/BottomNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { buildWhatsAppLink, requestPushPermission } from "@/lib/notifications";
 
 export const Route = createFileRoute("/book")({
   head: () => ({ meta: [{ title: "Book Your Session — Melanin Hair" }] }),
@@ -46,6 +47,8 @@ function BookPage() {
   const [date, setDate] = useState<string | null>(null); // yyyy-mm-dd
   const [time, setTime] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -147,10 +150,11 @@ function BookPage() {
   const next = () => setStep((s) => Math.min(s + 1, 3));
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
+  const phoneOk = /^[+\d][\d\s()-]{6,}$/.test(contactPhone.trim());
   const canNext =
     (step === 0 && styleId !== null) ||
     (step === 1 && date !== null && time !== null) ||
-    step === 2 ||
+    (step === 2 && contactName.trim().length >= 2 && phoneOk) ||
     step === 3;
 
   const selectedStyle = styles.find((s) => s.id === styleId) ?? null;
@@ -186,10 +190,34 @@ function BookPage() {
         booking_date: date,
         booking_time: time,
         notes: notes || null,
+        contact_name: contactName.trim(),
+        contact_phone: contactPhone.trim(),
         status: "pending",
       });
       if (error) throw error;
-      toast.success("Booking sent — you'll get a confirmation soon.");
+
+      // Build the WhatsApp message for the owner
+      const prettyDate = new Date(date + "T00:00:00").toLocaleDateString("en", {
+        weekday: "long", month: "short", day: "numeric",
+      });
+      const priceLine = selectedStyle.price_cents != null
+        ? `\nPrice: ${fmtPrice(selectedStyle.price_cents)}` : "";
+      const notesLine = notes ? `\nNotes: ${notes}` : "";
+      const message =
+        `Hi Hermine — I just booked on Melanin Hair ✨\n\n` +
+        `Name: ${contactName.trim()}\n` +
+        `Phone: ${contactPhone.trim()}\n` +
+        `Style: ${selectedStyle.title}\n` +
+        `Date: ${prettyDate}\n` +
+        `Time: ${time}` + priceLine + notesLine;
+
+      // Open WhatsApp in a new tab so the owner gets a direct message
+      window.open(buildWhatsAppLink(message), "_blank", "noopener");
+
+      // Politely ask for notification permission so we can ping on confirmation
+      requestPushPermission();
+
+      toast.success("Booking sent — opening WhatsApp to notify Hermine.");
       setDone(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save booking");
@@ -329,15 +357,41 @@ function BookPage() {
 
             {step === 2 && (
               <>
-                <h1 className="font-display text-3xl md:text-4xl">A few details.</h1>
-                <p className="text-xs text-muted-foreground mt-2">Optional — but helpful.</p>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={5}
-                  placeholder="Any inspirations, sensitivities, or special requests…"
-                  className="mt-6 w-full bg-card rounded-2xl p-4 text-sm outline-none border border-border/50 focus:border-gold/40 transition-colors resize-none"
-                />
+                <h1 className="font-display text-3xl md:text-4xl">Your details.</h1>
+                <p className="text-xs text-muted-foreground mt-2">So Hermine can reach you on WhatsApp.</p>
+
+                <div className="mt-6 space-y-3">
+                  <div className="relative">
+                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                      placeholder="Full name"
+                      autoComplete="name"
+                      className="w-full bg-card rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none border border-border/50 focus:border-gold/40 transition-colors"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <input
+                      type="tel"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      placeholder="WhatsApp number (e.g. +264 81 …)"
+                      autoComplete="tel"
+                      inputMode="tel"
+                      className="w-full bg-card rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none border border-border/50 focus:border-gold/40 transition-colors"
+                    />
+                  </div>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={4}
+                    placeholder="Inspirations, sensitivities, or special requests… (optional)"
+                    className="w-full bg-card rounded-2xl p-4 text-sm outline-none border border-border/50 focus:border-gold/40 transition-colors resize-none"
+                  />
+                </div>
               </>
             )}
 
@@ -352,6 +406,8 @@ function BookPage() {
                     value={date ? new Date(date + "T00:00:00").toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric" }) : "—"}
                   />
                   <Row label="Time" value={time ?? "—"} />
+                  <Row label="Name" value={contactName || "—"} />
+                  <Row label="Phone" value={contactPhone || "—"} />
                   {notes && <Row label="Notes" value={notes} />}
                   <div className="border-t border-border/50 pt-3 flex justify-between">
                     <span className="text-sm">Total</span>

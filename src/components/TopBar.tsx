@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { Instagram, Search } from "lucide-react";
+import { Instagram } from "lucide-react";
 import { motion } from "framer-motion";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export function TopBar() {
   return (
@@ -20,13 +21,7 @@ export function TopBar() {
             </span>
           </Link>
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              aria-label="Search"
-              className="size-9 rounded-full hover:bg-white/5 flex items-center justify-center"
-            >
-              <Search className="size-4 text-muted-foreground" />
-            </button>
+            <NotificationBell />
             <a
               href="https://www.instagram.com/_melanin._.hair_/"
               target="_blank"
