@@ -14,9 +14,9 @@ export const Route = createFileRoute("/book")({
 });
 
 const styles = [
-  { img: s1, title: "Silk Press", price: "₦35k", duration: "2h" },
-  { img: s2, title: "Knotless", price: "₦60k", duration: "5h" },
-  { img: s3, title: "Naturals", price: "₦25k", duration: "1.5h" },
+  { img: s1, title: "Silk Press", price: "N$650", duration: "2h" },
+  { img: s2, title: "Knotless", price: "N$1,200", duration: "5h" },
+  { img: s3, title: "Naturals", price: "N$450", duration: "1.5h" },
 ];
 const days = Array.from({ length: 7 }, (_, i) => {
   const d = new Date();
