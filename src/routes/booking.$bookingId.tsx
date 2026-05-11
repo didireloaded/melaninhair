@@ -69,7 +69,7 @@ function BookingStatusPage() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel(`booking-${bookingId}`)
+      .channel(`user:${user.id}`, { config: { private: true } })
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "bookings", filter: `id=eq.${bookingId}` },
