@@ -8,9 +8,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { buildWhatsAppLink, requestPushPermission } from "@/lib/notifications";
+import { z } from "zod";
+
+const bookingSchema = z.object({
+  styleId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  time: z.string().regex(/^\d{2}:\d{2}$/),
+  contactName: z.string().trim().min(2, "Name must be at least 2 characters").max(80),
+  contactPhone: z
+    .string()
+    .trim()
+    .min(7, "Phone looks too short")
+    .max(20)
+    .regex(/^[+\d][\d\s()-]{6,}$/, "Enter a valid phone number"),
+  notes: z.string().trim().max(500).optional().nullable(),
+});
 
 export const Route = createFileRoute("/book")({
-  head: () => ({ meta: [{ title: "Book Your Session — Melanin Hair" }] }),
+  head: () => ({
+    meta: [
+      { title: "Book Your Session — Melanin Hair" },
+      { name: "description", content: "Reserve your spot with Hermine in seconds. Pick a style, time, and we'll confirm on WhatsApp." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: BookPage,
 });
 
@@ -166,35 +187,48 @@ function BookPage() {
       return;
     }
     if (!styleId || !date || !time || !selectedStyle) return;
+
+    const parsed = bookingSchema.safeParse({
+      styleId, date, time,
+      contactName, contactPhone, notes: notes || null,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Please check your details");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      // Re-check the slot at submit time (someone may have grabbed it)
-      const { data: clash } = await supabase
-        .from("bookings")
-        .select("id")
-        .eq("booking_date", date)
-        .eq("booking_time", time)
-        .in("status", ["pending", "confirmed"])
-        .limit(1);
-      if (clash && clash.length > 0) {
-        toast.error("That slot was just taken — please pick another time.");
-        setSubmitting(false);
-        setStep(1);
-        return;
-      }
       const { error } = await supabase.from("bookings").insert({
         user_id: user.id,
-        style_id: styleId,
+        style_id: parsed.data.styleId,
         style_title: selectedStyle.title,
         price_cents: selectedStyle.price_cents,
-        booking_date: date,
-        booking_time: time,
-        notes: notes || null,
-        contact_name: contactName.trim(),
-        contact_phone: contactPhone.trim(),
+        booking_date: parsed.data.date,
+        booking_time: parsed.data.time,
+        notes: parsed.data.notes ?? null,
+        contact_name: parsed.data.contactName,
+        contact_phone: parsed.data.contactPhone,
         status: "pending",
       });
-      if (error) throw error;
+      if (error) {
+        // 23505 = unique_violation from our partial index → slot just got grabbed
+        if (error.code === "23505") {
+          toast.error("That slot was just taken — please pick another time.");
+          setSubmitting(false);
+          setStep(1);
+          // refresh taken set
+          setTaken((prev) => {
+            const copy = { ...prev };
+            const set = new Set(copy[parsed.data.date] ?? []);
+            set.add(parsed.data.time);
+            copy[parsed.data.date] = set;
+            return copy;
+          });
+          return;
+        }
+        throw error;
+      }
 
       // Build the WhatsApp message for the owner
       const prettyDate = new Date(date + "T00:00:00").toLocaleDateString("en", {

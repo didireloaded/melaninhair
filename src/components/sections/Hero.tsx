@@ -8,7 +8,9 @@ export function Hero() {
     <section className="relative h-[100svh] min-h-[640px] w-full overflow-hidden">
       <motion.img
         src={hero}
-        alt="Editorial portrait"
+        alt="Hermine, founder of Melanin Hair, in editorial portrait"
+        fetchPriority="high"
+        decoding="async"
         initial={{ scale: 1.15 }}
         animate={{ scale: 1 }}
         transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1] }}
