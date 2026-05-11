@@ -14,16 +14,262 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      availability_blocks: {
+        Row: {
+          blocked_date: string
+          blocked_time: string | null
+          created_at: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          blocked_date: string
+          blocked_time?: string | null
+          created_at?: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          blocked_date?: string
+          blocked_time?: string | null
+          created_at?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
+      bookings: {
+        Row: {
+          booking_date: string
+          booking_time: string
+          created_at: string
+          id: string
+          inspiration_url: string | null
+          notes: string | null
+          price_cents: number | null
+          status: Database["public"]["Enums"]["booking_status"]
+          style_id: string | null
+          style_title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          booking_date: string
+          booking_time: string
+          created_at?: string
+          id?: string
+          inspiration_url?: string | null
+          notes?: string | null
+          price_cents?: number | null
+          status?: Database["public"]["Enums"]["booking_status"]
+          style_id?: string | null
+          style_title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          booking_date?: string
+          booking_time?: string
+          created_at?: string
+          id?: string
+          inspiration_url?: string | null
+          notes?: string | null
+          price_cents?: number | null
+          status?: Database["public"]["Enums"]["booking_status"]
+          style_id?: string | null
+          style_title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_style_id_fkey"
+            columns: ["style_id"]
+            isOneToOne: false
+            referencedRelation: "styles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      favorites: {
+        Row: {
+          created_at: string
+          gallery_item_id: string | null
+          id: string
+          style_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          gallery_item_id?: string | null
+          id?: string
+          style_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          gallery_item_id?: string | null
+          id?: string
+          style_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_gallery_item_id_fkey"
+            columns: ["gallery_item_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_style_id_fkey"
+            columns: ["style_id"]
+            isOneToOne: false
+            referencedRelation: "styles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gallery_items: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          instagram_id: string | null
+          instagram_permalink: string | null
+          is_featured: boolean
+          media_type: Database["public"]["Enums"]["media_type"]
+          media_url: string
+          sort_order: number
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          instagram_id?: string | null
+          instagram_permalink?: string | null
+          is_featured?: boolean
+          media_type?: Database["public"]["Enums"]["media_type"]
+          media_url: string
+          sort_order?: number
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          instagram_id?: string | null
+          instagram_permalink?: string | null
+          is_featured?: boolean
+          media_type?: Database["public"]["Enums"]["media_type"]
+          media_url?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      styles: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          price_cents: number | null
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          price_cents?: number | null
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          price_cents?: number | null
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      booking_status: "pending" | "confirmed" | "cancelled" | "completed"
+      media_type: "image" | "video"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +396,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      booking_status: ["pending", "confirmed", "cancelled", "completed"],
+      media_type: ["image", "video"],
+    },
   },
 } as const
