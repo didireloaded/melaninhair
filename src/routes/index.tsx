@@ -7,7 +7,6 @@ import { Trending } from "@/components/sections/Trending";
 import { Styles } from "@/components/sections/Styles";
 import { Founder } from "@/components/sections/Founder";
 import { Studio } from "@/components/sections/Studio";
-import { TryOn } from "@/components/sections/TryOn";
 import { Essentials } from "@/components/sections/Essentials";
 import { Footer } from "@/components/sections/Footer";
 
@@ -25,7 +24,6 @@ function Index() {
         <Styles />
         <Founder />
         <Studio />
-        <TryOn />
         <Essentials />
         <Footer />
       </main>
