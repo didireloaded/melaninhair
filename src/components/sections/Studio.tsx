@@ -166,7 +166,13 @@ export function Studio() {
               >
                 <X className="size-4" />
               </button>
-              <img src={items[active].src} alt="" className="w-full aspect-square object-cover" />
+              <img
+                src={items[active].src}
+                alt=""
+                onError={handleImgError(active)}
+                referrerPolicy="no-referrer"
+                className="w-full aspect-square object-cover"
+              />
               <div className="p-5">
                 <p className="text-sm leading-relaxed line-clamp-4">{items[active].caption}</p>
                 <div className="mt-4 flex items-center justify-between">
