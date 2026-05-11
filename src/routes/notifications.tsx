@@ -137,7 +137,7 @@ function NotificationsPage() {
                 return (
                   <li key={n.id}>
                     {n.link ? (
-                      <Link to={n.link} className="block">
+                      <Link to={n.link as string} className="block">
                         {Item}
                       </Link>
                     ) : (
