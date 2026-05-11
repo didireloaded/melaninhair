@@ -11,7 +11,7 @@ export function Footer() {
         <p className="text-xs text-muted-foreground mt-3 max-w-xs mx-auto">
           Reach out on the platform you live on — replies within the hour, most days.
         </p>
-        <div className="mt-6 flex items-center justify-center gap-3">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <a
             href="https://www.instagram.com/_melanin._.hair_/"
             target="_blank"
@@ -30,9 +30,9 @@ export function Footer() {
           </a>
           <Link
             to="/book"
-            className="px-5 h-11 rounded-full bg-gradient-gold text-primary-foreground text-sm font-medium flex items-center"
+            className="px-5 h-11 rounded-full bg-gradient-gold text-primary-foreground text-sm font-medium flex items-center whitespace-nowrap"
           >
-            Book Your Session
+            Book a session
           </Link>
         </div>
         <div className="mt-7 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
