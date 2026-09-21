@@ -44,36 +44,36 @@
 
 :root {
   --radius: 1.25rem;
-  /* Dark luxury */
-  --background: oklch(0.14 0.005 60);          /* near #0D0D0D */
-  --foreground: oklch(0.96 0.012 80);          /* cream */
-  --card: oklch(0.18 0.006 60);                /* #1A1A1A */
-  --card-foreground: oklch(0.96 0.012 80);
-  --popover: oklch(0.18 0.006 60);
-  --popover-foreground: oklch(0.96 0.012 80);
-  --primary: oklch(0.82 0.07 75);              /* #D4B896 gold */
-  --primary-foreground: oklch(0.14 0.005 60);
-  --secondary: oklch(0.22 0.006 60);
-  --secondary-foreground: oklch(0.96 0.012 80);
-  --muted: oklch(0.24 0.006 60);
-  --muted-foreground: oklch(0.7 0.02 75);
-  --accent: oklch(0.92 0.04 80);               /* #F5E6D3 */
-  --accent-foreground: oklch(0.14 0.005 60);
-  --gold: oklch(0.82 0.07 75);
-  --cream: oklch(0.92 0.04 80);
-  --sand: oklch(0.96 0.012 80);
+  /* Entranced Beauty — warm espresso + rose nude */
+  --background: oklch(0.17 0.018 35);          /* deep espresso */
+  --foreground: oklch(0.96 0.015 60);          /* warm cream */
+  --card: oklch(0.22 0.02 35);
+  --card-foreground: oklch(0.96 0.015 60);
+  --popover: oklch(0.22 0.02 35);
+  --popover-foreground: oklch(0.96 0.015 60);
+  --primary: oklch(0.79 0.065 28);             /* rose nude */
+  --primary-foreground: oklch(0.19 0.02 35);
+  --secondary: oklch(0.26 0.02 35);
+  --secondary-foreground: oklch(0.96 0.015 60);
+  --muted: oklch(0.29 0.018 35);
+  --muted-foreground: oklch(0.74 0.025 40);
+  --accent: oklch(0.91 0.035 50);              /* soft blush cream */
+  --accent-foreground: oklch(0.19 0.02 35);
+  --gold: oklch(0.79 0.065 28);                /* rose nude accent */
+  --cream: oklch(0.93 0.03 55);
+  --sand: oklch(0.96 0.015 60);
   --destructive: oklch(0.55 0.18 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(1 0 0 / 8%);
+  --border: oklch(1 0 0 / 9%);
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.82 0.07 75 / 60%);
+  --ring: oklch(0.79 0.065 28 / 60%);
 
-  --gradient-luxe: linear-gradient(135deg, oklch(0.18 0.006 60) 0%, oklch(0.14 0.005 60) 100%);
-  --gradient-gold: linear-gradient(135deg, oklch(0.92 0.04 80) 0%, oklch(0.82 0.07 75) 100%);
-  --gradient-overlay: linear-gradient(180deg, transparent 0%, oklch(0.14 0.005 60 / 0.3) 40%, oklch(0.14 0.005 60 / 0.95) 100%);
+  --gradient-luxe: linear-gradient(135deg, oklch(0.24 0.022 35) 0%, oklch(0.17 0.018 35) 100%);
+  --gradient-gold: linear-gradient(135deg, oklch(0.93 0.03 55) 0%, oklch(0.79 0.065 28) 55%, oklch(0.71 0.07 25) 100%);
+  --gradient-overlay: linear-gradient(180deg, transparent 0%, oklch(0.17 0.018 35 / 0.35) 40%, oklch(0.17 0.018 35 / 0.96) 100%);
 
   --shadow-soft: 0 20px 60px -20px oklch(0 0 0 / 0.6);
-  --shadow-glow: 0 0 80px -20px oklch(0.82 0.07 75 / 0.4);
+  --shadow-glow: 0 0 80px -20px oklch(0.79 0.065 28 / 0.45);
 }
 
 @layer base {
