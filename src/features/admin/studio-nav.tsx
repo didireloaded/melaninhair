@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { PushOptIn } from "./push-opt-in";
 
 const links = [
   ["/admin", "Bookings"],
@@ -44,6 +45,7 @@ export function StudioNav() {
           );
         })}
       </nav>
+      <PushOptIn />
     </header>
   );
 }

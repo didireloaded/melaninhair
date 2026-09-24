@@ -15,6 +15,7 @@ export const metadata: Metadata = {
     title: "Entranced Beauty",
     statusBarStyle: "default",
   },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 
 export const viewport: Viewport = {

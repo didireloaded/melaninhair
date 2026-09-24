@@ -14,6 +14,7 @@ import { bookingPayloadSchema } from "@/lib/validation";
 import type { BookingReceipt } from "@/types/domain";
 import { assertSlotOpen, buildLines } from "./availability";
 import { getSettingsRow } from "./public";
+import { notifyOwner } from "@/lib/push";
 
 export async function createBooking(raw: unknown, image?: Buffer | null): Promise<BookingReceipt> {
   const parsed = bookingPayloadSchema.parse(raw);
@@ -23,7 +24,7 @@ export async function createBooking(raw: unknown, image?: Buffer | null): Promis
   let savedFile: string | null = null;
 
   try {
-    return await db.transaction(async (tx) => {
+    const receipt = await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(4812, hashtext(${parsed.date}))`);
       const built = await buildLines(tx, parsed.services, parsed.date);
       const flags = await tx.select({ id: services.id, requiresInspiration: services.requiresInspiration }).from(services);
@@ -132,6 +133,8 @@ export async function createBooking(raw: unknown, image?: Buffer | null): Promis
         ),
       };
     });
+    void notifyOwner({ title: "New booking request", body: `${receipt.clientName} · ${receipt.dateLabel} at ${receipt.startTime}`, url: "/admin" });
+    return receipt;
   } catch (error) {
     if (savedFile) {
       await unlink(path.join(process.cwd(), "storage", "inspiration", savedFile)).catch(() => undefined);
