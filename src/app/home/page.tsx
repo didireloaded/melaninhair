@@ -32,7 +32,7 @@ export default async function HomePage() {
             <p className="text-[13px] text-muted">Hello, beautiful</p>
             <h1 className="mt-1 text-[26px] font-semibold leading-none tracking-[-0.045em]">Ready for a new look?</h1>
           </div>
-          <Link href="/book" aria-label="Book an appointment" className="grid h-11 w-11 place-items-center rounded-full bg-[#0a0814] text-lg text-white">+</Link>
+          <Link href="/book" aria-label="Book an appointment" className="grid h-11 w-11 place-items-center rounded-full bg-[#3D4A3D] text-lg text-white">+</Link>
         </div>
 
         <form action="/services" className="mt-5 flex h-12 items-center gap-2 rounded-[16px] border border-line bg-white pl-4 pr-1.5">

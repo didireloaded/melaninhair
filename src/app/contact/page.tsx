@@ -15,7 +15,7 @@ export default async function ContactPage() {
     <PhoneFrame>
       <TopBar businessName={business.businessName} whatsapp={business.whatsapp} instagram={business.instagram} />
       <main className="px-5 pb-8">
-        <div className="mt-5 rounded-[24px] bg-[#0a0814] px-5 py-6 text-white">
+        <div className="mt-5 rounded-[24px] bg-[#3D4A3D] px-5 py-6 text-white">
           <p className="text-[12px] uppercase tracking-[0.16em] text-white/55">Visit the studio</p>
           <h1 className="mt-2 text-[30px] font-semibold tracking-[-0.04em]">Let’s create your look.</h1>
           <p className="mt-2 text-[14px] text-white/65">{business.locationText}</p>

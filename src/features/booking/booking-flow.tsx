@@ -125,7 +125,7 @@ export function BookingFlow({
 
   return (
     <div className="min-h-dvh">
-      <header className="flex items-center bg-[#0a0814] px-2 pb-2 pt-[max(8px,env(safe-area-inset-top))] text-white">
+      <header className="flex items-center bg-[#3D4A3D] px-2 pb-2 pt-[max(8px,env(safe-area-inset-top))] text-white">
         <button type="button" aria-label="Back" onClick={back} className="grid h-11 w-11 place-items-center">
           <ChevronLeft size={20} />
         </button>

@@ -27,7 +27,7 @@ export default async function ServicesPage({
 
   return (
     <PhoneFrame>
-      <div className="bg-[#0a0814] px-5 pb-8 pt-[max(16px,env(safe-area-inset-top))] text-white">
+      <div className="bg-[#3D4A3D] px-5 pb-8 pt-[max(16px,env(safe-area-inset-top))] text-white">
         <div className="flex items-center gap-2">
           <Link href="/home" aria-label="Back" className="grid h-10 w-10 place-items-center rounded-full bg-white/15">
             <ChevronLeft size={22} />
@@ -87,7 +87,7 @@ export default async function ServicesPage({
                     </p>
                   </div>
                   {service.bookingEnabled ? (
-                    <Link href={`/book?service=${service.slug}`} aria-label={`Book ${service.name}`} className="press grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#0a0814] text-xl leading-none text-white">
+                    <Link href={`/book?service=${service.slug}`} aria-label={`Book ${service.name}`} className="press grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#3D4A3D] text-xl leading-none text-white">
                       +
                     </Link>
                   ) : (

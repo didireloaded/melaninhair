@@ -15,7 +15,7 @@ export function BottomNav() {
   const pathname = usePathname();
   return (
     <nav className="fixed bottom-0 left-1/2 z-30 w-full max-w-[430px] -translate-x-1/2 border-t border-white/70 bg-white/80 backdrop-blur-xl">
-      <ul className="grid grid-cols-4 bg-[#0a0814] pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5">
+      <ul className="grid grid-cols-4 bg-[#3D4A3D] pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5">
         {items.map((item) => {
           const active = pathname === item.href || (item.href !== "/home" && pathname.startsWith(item.href));
           const Icon = item.icon;

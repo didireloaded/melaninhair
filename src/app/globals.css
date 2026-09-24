@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-coral: #8d6cff;
-  --color-coral-soft: #c7baff;
-  --color-coral-pressed: #7254e3;
-  --color-blush: #f1efff;
-  --color-paper: #f8f8fc;
-  --color-ink: #0a0814;
-  --color-muted: #77758a;
-  --color-line: #e8e7f0;
-  --color-nude: #d7d5e3;
-  --color-brown: #3f3048;
-  --color-chocolate: #0a0814;
+  --color-coral: #3D4A3D;
+  --color-coral-soft: #E8BEBE;
+  --color-coral-pressed: #2E382E;
+  --color-blush: #F5D7D7;
+  --color-paper: #F5F1E8;
+  --color-ink: #1F1F1F;
+  --color-muted: #8A8A8A;
+  --color-line: #EDE7DA;
+  --color-nude: #EDE7DA;
+  --color-brown: #3D4A3D;
+  --color-chocolate: #3D4A3D;
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
   --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
 }
 
 html {
-  background: #eeeef9;
+  background: #F5F1E8;
 }
 
 body {
@@ -25,7 +25,7 @@ body {
   min-height: 100dvh;
   font-family: var(--font-sans);
   color: var(--color-ink);
-  background: #eeeef9;
+  background: #F5F1E8;
 }
 
 ::selection {
