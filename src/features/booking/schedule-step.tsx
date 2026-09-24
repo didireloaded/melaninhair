@@ -133,26 +133,36 @@ export function ScheduleStep({
               <p className="text-[14px] text-muted">Try another day.</p>
             </div>
           ) : (
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {day.slots.map((slot) => (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => {
-                    tap("select");
-                    onTime(slot);
-                  }}
-                  className={`h-11 rounded-[12px] text-[14px] ${time === slot ? "bg-coral text-white" : "border border-line bg-white"}`}
-                >
-                  {slot}
-                </button>
-              ))}
-            </div>
+            <TimeGroups slots={day.slots} value={time} onChange={onTime} />
           )}
         </div>
       ) : (
         <p className="mt-4 text-[14px] text-muted">Pick a date to see times.</p>
       )}
+    </div>
+  );
+}
+
+function TimeGroups({ slots, value, onChange }: { slots: string[]; value: string | null; onChange: (slot: string) => void }) {
+  const groups = [
+    ["Morning", slots.filter((slot) => Number(slot.slice(0, 2)) < 12)],
+    ["Afternoon", slots.filter((slot) => Number(slot.slice(0, 2)) >= 12 && Number(slot.slice(0, 2)) < 17)],
+    ["Evening", slots.filter((slot) => Number(slot.slice(0, 2)) >= 17)],
+  ] as const;
+  return (
+    <div>
+      {groups.map(([label, group]) => group.length ? (
+        <div key={label} className="mt-4">
+          <p className="mb-2 text-[11px] uppercase tracking-wide text-muted">{label}</p>
+          <div className="grid grid-cols-3 gap-2">
+            {group.map((slot) => (
+              <button key={slot} type="button" onClick={() => { tap("select"); onChange(slot); }} className={`rounded-full border py-2.5 text-[12.5px] transition ${value === slot ? "border-[#3D4A3D] bg-[#3D4A3D] text-white" : "border-line bg-white text-ink hover:bg-[#FBF7EF]"}`}>
+                {slot}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null)}
     </div>
   );
 }

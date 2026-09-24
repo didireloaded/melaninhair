@@ -40,6 +40,7 @@ export function BookingFlow({
   const chosen = services.filter((service) => selected.some((item) => item.serviceId === service.id));
   const needsPhoto = chosen.some((service) => service.requiresInspiration);
   const title = step === "services" ? "Choose your service" : step === "schedule" ? "Select date & time" : step === "details" ? "Your details" : step === "review" ? "Booking summary" : "Booking received";
+  const progress = step === "services" ? 0 : step === "schedule" ? 1 : step === "details" ? 2 : 3;
 
   const estimate = useMemo(() => {
     return chosen.reduce(
@@ -132,6 +133,19 @@ export function BookingFlow({
         <h1 className="flex-1 text-center text-[17px] font-semibold">{title}</h1>
         <span className="w-11" />
       </header>
+      {step !== "done" ? (
+        <div className="flex items-center gap-1.5 bg-[#3D4A3D] px-5 pb-5 text-white">
+          {["Style", "Date", "Time", "Confirm"].map((label, index) => (
+            <div key={label} className="flex min-w-0 flex-1 items-center gap-1.5">
+              <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-medium ${index <= progress ? "bg-white text-[#3D4A3D]" : "border border-white/30 text-white/60"}`}>
+                {index < progress ? <Check size={13} strokeWidth={3} /> : index + 1}
+              </span>
+              <span className={`hidden truncate text-[11px] sm:inline ${index <= progress ? "font-medium text-white" : "text-white/50"}`}>{label}</span>
+              {index < 3 ? <span className={`h-px flex-1 ${index < progress ? "bg-white" : "bg-white/20"}`} /> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
       {step === "services" ? <ServiceStep services={services} selected={selected} symbol={business.currencySymbol} onToggle={toggle} /> : null}
       {step === "schedule" ? (
         <ScheduleStep

@@ -37,17 +37,17 @@ export function MonthGrid({
   }
 
   return (
-    <div>
+    <div className="rounded-[24px] border border-line bg-white p-4">
       <div className="mb-3 flex items-center justify-between">
-        <button type="button" aria-label="Previous month" onClick={() => shift(-1)} disabled={cursor <= minCursor} className="grid h-10 w-10 place-items-center rounded-full disabled:opacity-30">
+        <button type="button" aria-label="Previous month" onClick={() => shift(-1)} disabled={cursor <= minCursor} className="grid h-9 w-9 place-items-center rounded-full hover:bg-[#FBF7EF] disabled:opacity-30">
           <ChevronLeft size={20} />
         </button>
-        <h2 className="text-[18px] font-semibold">{MONTHS[month - 1]} {year}</h2>
-        <button type="button" aria-label="Next month" onClick={() => shift(1)} disabled={cursor >= maxCursor} className="grid h-10 w-10 place-items-center rounded-full disabled:opacity-30">
+        <h2 className="font-serif text-[17px] text-ink">{MONTHS[month - 1]} {year}</h2>
+        <button type="button" aria-label="Next month" onClick={() => shift(1)} disabled={cursor >= maxCursor} className="grid h-9 w-9 place-items-center rounded-full hover:bg-[#FBF7EF] disabled:opacity-30">
           <ChevronRight size={20} />
         </button>
       </div>
-      <div className="grid grid-cols-7 text-center text-[12px] text-muted">
+      <div className="grid grid-cols-7 text-center text-[11px] font-medium uppercase tracking-wide text-muted">
         {WEEK.map((day, index) => (
           <span key={`${day}-${index}`}>{day}</span>
         ))}
@@ -70,12 +70,12 @@ export function MonthGrid({
                 tap("select");
                 onSelect(date);
               }}
-              className={`mx-auto my-0.5 flex h-10 w-10 flex-col items-center justify-center rounded-full text-[15px] ${
-                isSelected ? "bg-coral text-white" : selectable ? "text-ink" : "text-[#d3c6c4]"
+              className={`mx-auto my-0.5 flex h-10 w-10 flex-col items-center justify-center rounded-full text-[14px] ${
+                isSelected ? "bg-[#3D4A3D] font-medium text-white" : selectable ? "text-ink hover:bg-[#FBF7EF]" : "text-muted/40"
               } ${info?.date === selected ? "" : ""} ${!isSelected && info && date === info.date && info.status === "available" ? "" : ""}`}
             >
               <span className={!isSelected && info?.status === "available" && date.endsWith(String(new Date().getDate()).padStart(2, "0")) ? "" : ""}>{day}</span>
-              {selectable && !isSelected ? <span className="h-1 w-1 rounded-full bg-coral-soft" /> : <span className="h-1 w-1" />}
+              {selectable && !isSelected ? <span className="h-1 w-1 rounded-full bg-[#E8BEBE]" /> : <span className="h-1 w-1" />}
             </button>
           );
         })}
