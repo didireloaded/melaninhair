@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  --color-coral: #8d6cff;
+  --color-coral-soft: #c7baff;
+  --color-coral-pressed: #7254e3;
+  --color-blush: #f1efff;
+  --color-paper: #f8f8fc;
+  --color-ink: #0a0814;
+  --color-muted: #77758a;
+  --color-line: #e8e7f0;
+  --color-nude: #d7d5e3;
+  --color-brown: #3f3048;
+  --color-chocolate: #0a0814;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+html {
+  background: #eeeef9;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: #eeeef9;
+}
+
+::selection {
+  background: #f1e3e7;
+}
+
+:focus-visible {
+  outline: 2px solid #8d6cff;
+  outline-offset: 2px;
+}
+
+button,
+a,
+input,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.press {
+  transition: transform 160ms ease;
+}
+
+.press:active {
+  transform: scale(0.98);
+}
+
+.press.bg-coral:active {
+  background-color: var(--color-coral-pressed);
+}
+
+.rise {
+  animation: rise 420ms ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press,
+  .rise {
+    animation: none;
+    transition: none;
+  }
+}
