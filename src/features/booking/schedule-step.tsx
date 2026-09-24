@@ -100,7 +100,7 @@ export function ScheduleStep({
       ) : null}
       <div className="mt-5">
         {query.isError ? <p className="mb-3 text-[14px] text-muted">Could not load the calendar. Check your connection and try again.</p> : null}
-        {query.isLoading ? <p className="mb-2 text-[13px] text-muted">Checking the month…</p> : null}
+        {query.isLoading ? <p className="mb-2 text-[13px] text-muted" role="status">Checking the month…</p> : null}
         <MonthGrid
           cursor={cursor}
           minCursor={minCursor}
@@ -129,8 +129,10 @@ export function ScheduleStep({
             <p className="mt-3 text-[14px] text-muted">Closed this day.</p>
           ) : !day?.slots.length ? (
             <div className="mt-3">
-              <p className="text-[15px]">No times left for this date.</p>
-              <p className="text-[14px] text-muted">Try another day.</p>
+              <div className="rounded-2xl bg-[#FBF7EF] p-5 text-center">
+                <p className="text-[15px]">No openings that day</p>
+                <p className="mt-1 text-[14px] text-muted">Try another date to see available times.</p>
+              </div>
             </div>
           ) : (
             <TimeGroups slots={day.slots} value={time} onChange={onTime} />

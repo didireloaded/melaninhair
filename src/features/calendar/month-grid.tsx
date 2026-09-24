@@ -37,7 +37,7 @@ export function MonthGrid({
   }
 
   return (
-    <div className="rounded-[24px] border border-line bg-white p-4">
+    <div className="rounded-[24px] border border-line bg-white p-4" aria-label="Booking calendar">
       <div className="mb-3 flex items-center justify-between">
         <button type="button" aria-label="Previous month" onClick={() => shift(-1)} disabled={cursor <= minCursor} className="grid h-9 w-9 place-items-center rounded-full hover:bg-[#FBF7EF] disabled:opacity-30">
           <ChevronLeft size={20} />
@@ -79,6 +79,11 @@ export function MonthGrid({
             </button>
           );
         })}
+      </div>
+      <div className="mt-3 flex items-center justify-center gap-4 border-t border-line pt-3 text-[10.5px] text-muted">
+        <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#3D4A3D]" />Available</span>
+        <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#E8BEBE]" />Full</span>
+        <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full ring-1 ring-[#C9A227]" />Today</span>
       </div>
     </div>
   );
