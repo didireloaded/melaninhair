@@ -23,3 +23,5 @@ export async function startFirebaseAnalytics() {
   if (await isSupported()) return getAnalytics(firebaseApp);
   return null;
 }
+
+export const firebaseVapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY ?? null;
