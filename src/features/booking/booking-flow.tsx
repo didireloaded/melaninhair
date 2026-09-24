@@ -12,7 +12,8 @@ import { ReviewStep } from "./review-step";
 import { ScheduleStep } from "./schedule-step";
 import { ServiceStep } from "./service-step";
 
-type Step = "services" | "schedule" | "details" | "review" | "done";
+type Step = "services" | "schedule" | "location" | "details" | "review" | "done";
+type BookingLocation = "studio" | "mobile";
 
 export function BookingFlow({
   services,
@@ -31,6 +32,7 @@ export function BookingFlow({
   const [selected, setSelected] = useState<SelectedService[]>(initial ? [{ serviceId: initial.id, addons: [] }] : []);
   const [date, setDate] = useState<string | null>(initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate) ? initialDate : null);
   const [time, setTime] = useState<string | null>(null);
+  const [location, setLocation] = useState<BookingLocation>("studio");
   const [details, setDetails] = useState<DetailValues>({ name: "", phone: "", notes: "" });
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -39,8 +41,8 @@ export function BookingFlow({
   const [submitting, setSubmitting] = useState(false);
   const chosen = services.filter((service) => selected.some((item) => item.serviceId === service.id));
   const needsPhoto = chosen.some((service) => service.requiresInspiration);
-  const title = step === "services" ? "Choose your service" : step === "schedule" ? "Select date & time" : step === "details" ? "Your details" : step === "review" ? "Booking summary" : "Booking received";
-  const progress = step === "services" ? 0 : step === "schedule" ? 1 : step === "details" ? 2 : 3;
+  const title = step === "services" ? "Choose your service" : step === "schedule" ? "Select date & time" : step === "location" ? "Choose location" : step === "details" ? "Your details" : step === "review" ? "Booking summary" : "Booking received";
+  const progress = step === "services" ? 0 : step === "schedule" ? 1 : step === "location" ? 2 : 3;
 
   const estimate = useMemo(() => {
     return chosen.reduce(
@@ -61,7 +63,8 @@ export function BookingFlow({
   function back() {
     setError(null);
     if (step === "schedule") setStep("services");
-    else if (step === "details") setStep("schedule");
+    else if (step === "location") setStep("schedule");
+    else if (step === "details") setStep("location");
     else if (step === "review") setStep("details");
     else if (step === "done") router.push("/home");
     else router.back();
@@ -170,6 +173,9 @@ export function BookingFlow({
           }}
         />
       ) : null}
+      {step === "location" ? (
+        <LocationStep value={location} onChange={setLocation} businessLocation={business.locationText} />
+      ) : null}
       {step === "details" ? (
         <DetailsStep
           values={details}
@@ -196,7 +202,7 @@ export function BookingFlow({
         />
       ) : null}
       {step === "review" && date && time ? (
-        <ReviewStep business={business} selected={selected} date={date} time={time} name={details.name} phone={details.phone} notes={details.notes} preview={preview} />
+        <ReviewStep business={business} selected={selected} date={date} time={time} name={details.name} phone={details.phone} notes={details.notes} preview={preview} location={location} />
       ) : null}
       {step === "done" && receipt ? <Success receipt={receipt} /> : null}
       {error ? <p className="px-5 pb-3 text-[14px] text-coral">{error}</p> : null}
@@ -208,7 +214,13 @@ export function BookingFlow({
             </button>
           ) : null}
           {step === "schedule" ? (
-            <button type="button" disabled={!date || !time} onClick={() => setStep("details")} className="press h-[52px] w-full rounded-[16px] bg-coral text-[16px] font-medium text-white disabled:opacity-40">
+            <button type="button" disabled={!date || !time} onClick={() => setStep("location")} className="press h-[52px] w-full rounded-[16px] bg-coral text-[16px] font-medium text-white disabled:opacity-40">
+              Continue
+            </button>
+          ) : null}
+          {step === "schedule" ? null : null}
+          {step === "location" ? (
+            <button type="button" onClick={() => setStep("details")} className="press h-[52px] w-full rounded-[16px] bg-coral text-[16px] font-medium text-white">
               Continue
             </button>
           ) : null}
@@ -242,12 +254,34 @@ function Success({ receipt }: { receipt: BookingReceipt }) {
       </p>
       <p className="mt-1 text-[15px]">{formatMoney(receipt.total, receipt.currencySymbol)}</p>
       <p className="mx-auto mt-4 max-w-[280px] text-[14px] leading-6 text-muted">{receipt.businessName} will confirm your appointment shortly.</p>
-      <a href={receipt.whatsappUrl} className="press mt-8 flex h-[52px] items-center justify-center rounded-[16px] bg-coral text-[16px] font-medium text-white">
+      <a href={`data:text/calendar;charset=utf-8,BEGIN:VCALENDAR%0AVERSION:2.0%0ASUMMARY:${encodeURIComponent(receipt.services.map((service) => service.name).join(" + "))}%0ADTSTART:${receipt.date.replaceAll("-", "")}T${receipt.startTime.replace(":", "")}00%0AEND:VCALENDAR`} download="entranced-beauty-appointment.ics" className="press mt-8 flex h-[52px] items-center justify-center rounded-[16px] border border-coral text-[16px] font-medium text-coral">
+        Add to calendar
+      </a>
+      <a href={receipt.whatsappUrl} className="press mt-2 flex h-[52px] items-center justify-center rounded-[16px] bg-coral text-[16px] font-medium text-white">
         WhatsApp Us
       </a>
       <a href="/home" className="mt-2 flex h-12 items-center justify-center text-[15px] text-brown">
         Done
       </a>
+    </div>
+  );
+}
+
+function LocationStep({ value, onChange, businessLocation }: { value: BookingLocation; onChange: (value: BookingLocation) => void; businessLocation: string }) {
+  return (
+    <div className="px-5 pb-4 pt-6">
+      <h2 className="font-serif text-[30px] leading-tight">Where would you like your appointment?</h2>
+      <p className="mt-2 text-[14px] leading-6 text-muted">Choose your preferred setting. This selection is shown on your review before you confirm.</p>
+      <div className="mt-6 space-y-3">
+        <button type="button" onClick={() => onChange("studio")} className={`flex w-full items-start gap-3 rounded-[20px] border p-4 text-left ${value === "studio" ? "border-coral bg-blush/40" : "border-line bg-white"}`}>
+          <span className={`mt-0.5 grid h-5 w-5 place-items-center rounded-full border ${value === "studio" ? "border-coral bg-coral" : "border-line"}`}><span className="h-2 w-2 rounded-full bg-white" /></span>
+          <span><strong className="block text-[15px]">At the studio</strong><span className="mt-1 block text-[13px] text-muted">{businessLocation}</span></span>
+        </button>
+        <button type="button" onClick={() => onChange("mobile")} className={`flex w-full items-start gap-3 rounded-[20px] border p-4 text-left ${value === "mobile" ? "border-coral bg-blush/40" : "border-line bg-white"}`}>
+          <span className={`mt-0.5 grid h-5 w-5 place-items-center rounded-full border ${value === "mobile" ? "border-coral bg-coral" : "border-line"}`}><span className="h-2 w-2 rounded-full bg-white" /></span>
+          <span><strong className="block text-[15px]">Mobile appointment</strong><span className="mt-1 block text-[13px] text-muted">Travel details and any additional fee will be confirmed by WhatsApp.</span></span>
+        </button>
+      </div>
     </div>
   );
 }

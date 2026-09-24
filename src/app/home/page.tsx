@@ -85,7 +85,7 @@ export default async function HomePage() {
               </Link>
             </div>
             <Link
-              href={special.serviceSlug ? `/book?service=${special.serviceSlug}` : "/services"}
+              href={special.serviceSlug ? "/look" : "/services"}
               className="grid grid-cols-[1fr_124px] overflow-hidden rounded-[22px] bg-[#3f3048] text-white"
             >
               <div className="p-5">

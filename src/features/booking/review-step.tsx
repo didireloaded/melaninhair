@@ -16,6 +16,7 @@ export function ReviewStep({
   phone,
   notes,
   preview,
+  location,
 }: {
   business: PublicBusiness;
   selected: SelectedService[];
@@ -25,6 +26,7 @@ export function ReviewStep({
   phone: string;
   notes: string;
   preview: string | null;
+  location: "studio" | "mobile";
 }) {
   const quote = useQuery({
     queryKey: ["quote", date, time, selected],
@@ -44,6 +46,7 @@ export function ReviewStep({
           <p className="mt-1 text-[14px] text-muted">{formatAppointmentDate(date, business.timezone)}</p>
           <p className="text-[14px] text-muted">{time}</p>
           <p className="mt-1 text-[13px] text-muted">{business.locationText}</p>
+          <p className="mt-1 text-[13px] font-medium text-coral">{location === "studio" ? "At the studio" : "Mobile appointment"}</p>
         </div>
       </article>
       <dl className="mt-5 space-y-3 text-[15px]">
