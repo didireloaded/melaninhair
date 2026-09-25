@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { Suspense } from "react";
 import { PhoneFrame } from "@/components/phone-frame";
 import { Photo } from "@/components/photo";
 import { TopBar } from "@/components/top-bar";
@@ -20,7 +21,6 @@ export default async function HomePage() {
   const today = todayInTimeZone(business.timezone);
   const popular = services.filter((service) => service.featured && service.bookingEnabled).slice(0, 6);
   const special = specials[0];
-  const days = await upcomingOpenDays(4);
   const work = portfolio.slice(0, 5);
 
   return (
@@ -104,28 +104,9 @@ export default async function HomePage() {
         ) : null}
 
         {/* Available This Week */}
-        {days.length ? (
-          <section className="mt-7">
-            <h2 className="text-[18px] font-semibold">Available this week</h2>
-            <div className="mt-3 flex gap-2.5">
-              {days.map((day) => (
-                <Link
-                  key={day.date}
-                  href={`/book?date=${day.date}`}
-                  className="flex h-[72px] w-[72px] flex-col items-center justify-center rounded-[14px] bg-white shadow-[0_4px_16px_rgba(70,51,50,0.06)]"
-                >
-                  <span className="text-[12px] text-muted">{formatWeekday(day.date, business.timezone)}</span>
-                  <span className="text-[20px] font-semibold">{Number(day.date.slice(8, 10))}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        ) : (
-          <section className="mt-7">
-            <h2 className="text-[18px] font-semibold">Available this week</h2>
-            <p className="mt-2 text-[14px] text-muted">No openings this week. Message us on WhatsApp.</p>
-          </section>
-        )}
+        <Suspense fallback={<AvailabilityFallback />}>
+          <AvailableThisWeek timezone={business.timezone} />
+        </Suspense>
 
         {/* Recent Work */}
         {work.length ? (
@@ -147,6 +128,50 @@ export default async function HomePage() {
         ) : null}
       </main>
     </PhoneFrame>
+  );
+}
+
+async function AvailableThisWeek({ timezone }: { timezone: string }) {
+  const days = await upcomingOpenDays(4);
+
+  if (!days.length) {
+    return (
+      <section className="mt-7">
+        <h2 className="text-[18px] font-semibold">Available this week</h2>
+        <p className="mt-2 text-[14px] text-muted">No openings this week. Message us on WhatsApp.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mt-7">
+      <h2 className="text-[18px] font-semibold">Available this week</h2>
+      <div className="mt-3 flex gap-2.5">
+        {days.map((day) => (
+          <Link
+            key={day.date}
+            href={`/book?date=${day.date}`}
+            className="flex h-[72px] w-[72px] flex-col items-center justify-center rounded-[14px] bg-white shadow-[0_4px_16px_rgba(70,51,50,0.06)]"
+          >
+            <span className="text-[12px] text-muted">{formatWeekday(day.date, timezone)}</span>
+            <span className="text-[20px] font-semibold">{Number(day.date.slice(8, 10))}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AvailabilityFallback() {
+  return (
+    <section className="mt-7" aria-busy="true">
+      <h2 className="text-[18px] font-semibold">Available this week</h2>
+      <div className="mt-3 flex gap-2.5">
+        {[0, 1, 2, 3].map((item) => (
+          <span key={item} className="h-[72px] w-[72px] animate-pulse rounded-[14px] bg-white/70" />
+        ))}
+      </div>
+    </section>
   );
 }
 
