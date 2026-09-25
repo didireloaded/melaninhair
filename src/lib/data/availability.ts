@@ -3,7 +3,7 @@ import { addonLineTotal, roundMoney } from "@/lib/booking/pricing";
 import { classifyDay, generateSlots, slotTakenByBooking } from "@/lib/booking/slots";
 import { addMinutesToTime, timeToMinutes, type Interval } from "@/lib/booking/time";
 import { addDaysToDateString, eachDate, isValidDateString, nowMinutesInTimeZone, todayInTimeZone, weekdayFromDateString } from "@/lib/dates";
-import { allDocuments } from "@/lib/firebase/firestore-store";
+import { allDocuments, cachedDocuments } from "@/lib/firebase/firestore-store";
 import type { DayAvailability, Quote, QuoteLine, SelectedService } from "@/types/domain";
 import { getPublicServices, getSettingsRow, priceForDate } from "./public";
 
@@ -91,7 +91,7 @@ function validateRange(from: string, to: string) {
 async function daysForRange(input: { from: string; to: string; duration: number; timezone: string; step: number; minNotice: number; excludeBookingId?: string; now?: Date }): Promise<DayAvailability[]> {
   const today = todayInTimeZone(input.timezone, input.now);
   const nowMinutes = nowMinutesInTimeZone(input.timezone, input.now);
-  const [hours, breaks, blocks, bookingMap] = await Promise.all([allDocuments<Hour>("businessHours"), allDocuments<Break>("businessBreaks"), allDocuments<Block>("availabilityBlocks"), occupyingIntervals(input.from, input.to, input.excludeBookingId)]);
+  const [hours, breaks, blocks, bookingMap] = await Promise.all([cachedDocuments<Hour>("businessHours"), cachedDocuments<Break>("businessBreaks"), allDocuments<Block>("availabilityBlocks"), occupyingIntervals(input.from, input.to, input.excludeBookingId)]);
   const hourMap = new Map(hours.map((hour) => [hour.dayOfWeek, hour]));
   return eachDate(input.from, input.to).map((date) => {
     const weekday = weekdayFromDateString(date);

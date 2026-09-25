@@ -1,6 +1,6 @@
 import { formatNamibianPhone } from "@/lib/booking/phone";
 import { todayInTimeZone } from "@/lib/dates";
-import { allDocuments } from "@/lib/firebase/firestore-store";
+import { cachedDocuments } from "@/lib/firebase/firestore-store";
 import type { PortfolioItem, PublicBusiness, PublicService, PublicSpecial } from "@/types/domain";
 
 type SettingsRow = Omit<PublicBusiness, "phoneDisplay" | "whatsappDisplay" | "hours" | "breaks"> & { id: string };
@@ -13,14 +13,14 @@ type BreakRow = { id: string; dayOfWeek: number; startTime: string; endTime: str
 type PortfolioRow = { id: string; category: string; caption: string; imageUrl: string; serviceId: string | null; sortOrder: number; active: boolean };
 
 export async function getSettingsRow(): Promise<SettingsRow> {
-  const [row] = await allDocuments<SettingsRow>("businessSettings");
+  const [row] = await cachedDocuments<SettingsRow>("businessSettings");
   if (!row) throw new Error("Business settings are missing from Firestore");
   return row;
 }
 
 export async function getPublicBusiness(): Promise<PublicBusiness> {
   const [settings, hours, breaks] = await Promise.all([
-    getSettingsRow(), allDocuments<HourRow>("businessHours"), allDocuments<BreakRow>("businessBreaks"),
+    getSettingsRow(), cachedDocuments<HourRow>("businessHours"), cachedDocuments<BreakRow>("businessBreaks"),
   ]);
   return {
     businessName: settings.businessName,
@@ -49,8 +49,8 @@ export async function getPublicServices(): Promise<PublicService[]> {
   const settings = await getSettingsRow();
   const today = todayInTimeZone(settings.timezone);
   const [categories, services, addons, specials] = await Promise.all([
-    allDocuments<CategoryRow>("serviceCategories"), allDocuments<ServiceRow>("services"),
-    allDocuments<AddonRow>("serviceAddons"), allDocuments<SpecialRow>("specials"),
+    cachedDocuments<CategoryRow>("serviceCategories"), cachedDocuments<ServiceRow>("services"),
+    cachedDocuments<AddonRow>("serviceAddons"), cachedDocuments<SpecialRow>("specials"),
   ]);
   const categoryMap = new Map(categories.filter((item) => item.active).map((item) => [item.id, item]));
   return services.filter((item) => item.active && categoryMap.has(item.categoryId)).map((service) => {
@@ -71,7 +71,7 @@ export async function getPublicServices(): Promise<PublicService[]> {
 export async function getLiveSpecials(): Promise<PublicSpecial[]> {
   const settings = await getSettingsRow();
   const today = todayInTimeZone(settings.timezone);
-  const [specials, services] = await Promise.all([allDocuments<SpecialRow>("specials"), allDocuments<ServiceRow>("services")]);
+  const [specials, services] = await Promise.all([cachedDocuments<SpecialRow>("specials"), cachedDocuments<ServiceRow>("services")]);
   const byId = new Map(services.map((item) => [item.id, item]));
   return specials.filter((item) => item.active && item.startDate <= today && item.endDate >= today).map((item) => ({
     id: item.id, name: item.name, description: item.description, serviceId: item.serviceId,
@@ -82,7 +82,7 @@ export async function getLiveSpecials(): Promise<PublicSpecial[]> {
 }
 
 export async function getPortfolio(): Promise<PortfolioItem[]> {
-  const [portfolio, services] = await Promise.all([allDocuments<PortfolioRow>("portfolioItems"), allDocuments<ServiceRow>("services")]);
+  const [portfolio, services] = await Promise.all([cachedDocuments<PortfolioRow>("portfolioItems"), cachedDocuments<ServiceRow>("services")]);
   const byId = new Map(services.map((item) => [item.id, item]));
   return portfolio.filter((item) => item.active).sort((a, b) => a.sortOrder - b.sortOrder).map((item) => ({
     id: item.id, category: item.category, caption: item.caption, imageUrl: item.imageUrl, serviceId: item.serviceId,
