@@ -65,7 +65,7 @@ export default async function HomePage() {
               return (
                 <article key={service.id} className="w-[82px] shrink-0 text-center">
                   <Link href={`/services/${service.slug}`} className="relative mx-auto grid h-[68px] w-[68px] place-items-center overflow-hidden rounded-[22px] bg-[#eeeef9] text-2xl text-[#3f3048]">
-                    {service.imageUrl ? <Photo src={service.imageUrl} alt="" sizes="68px" priority={index === 0} /> : null}
+                    {service.imageUrl ? <Photo src={service.imageUrl} alt="" sizes="68px" priority={index < 4} /> : null}
                     <span className="relative z-10">{service.categoryName === "Makeup" ? "✦" : service.categoryName === "Hair" ? "⌁" : "✧"}</span>
                   </Link>
                   <h3 className="mt-2 line-clamp-2 text-[12px] font-medium leading-[1.15]">{service.categoryName}</h3>
