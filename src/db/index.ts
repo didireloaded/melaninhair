@@ -38,7 +38,9 @@ function createDatabase(): AppDatabase {
   }
 
   // Fallback: embedded local PostgreSQL engine via PGlite
-  const dbDir = path.join(process.cwd(), "storage", "db");
+  const dbDir = process.env.VERCEL
+    ? path.join("/tmp", "entranced-beauty-db")
+    : path.join(process.cwd(), "storage", "db");
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
