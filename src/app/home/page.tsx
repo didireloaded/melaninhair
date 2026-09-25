@@ -97,7 +97,7 @@ export default async function HomePage() {
                 </span>
               </div>
               <div className="relative min-h-[172px] bg-coral-soft">
-                {special.imageUrl ? <Photo src={special.imageUrl} alt="" sizes="120px" /> : null}
+                {special.imageUrl ? <Photo src={special.imageUrl} alt="" sizes="124px" priority /> : null}
               </div>
             </Link>
           </section>
