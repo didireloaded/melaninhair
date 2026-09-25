@@ -1,147 +1,83 @@
-import { unlink } from "fs/promises";
-import path from "path";
-import { eq, like } from "drizzle-orm";
-import { sql } from "drizzle-orm";
-import { db } from "@/db";
-import { bookingAddons, bookingImages, bookingServices, bookings, services } from "@/db/schema";
+import { randomUUID } from "crypto";
+import { FieldValue } from "firebase-admin/firestore";
 import { whatsappHref, normalizeNamibianPhone } from "@/lib/booking/phone";
 import { makeReference } from "@/lib/booking/reference";
-import { addMinutesToTime } from "@/lib/booking/time";
+import { addMinutesToTime, timeToMinutes } from "@/lib/booking/time";
 import { formatAppointmentDate, todayInTimeZone } from "@/lib/dates";
 import { AppError } from "@/lib/errors";
-import { saveInspiration } from "@/lib/images";
+import { getFirebaseAdminFirestore, getFirebaseAdminStorage } from "@/lib/firebase/admin";
+import { detectImage } from "@/lib/images";
 import { bookingPayloadSchema } from "@/lib/validation";
 import type { BookingReceipt } from "@/types/domain";
 import { assertSlotOpen, buildLines } from "./availability";
-import { getSettingsRow } from "./public";
+import { getPublicServices, getSettingsRow } from "./public";
 import { notifyOwner } from "@/lib/push";
 
-export async function createBooking(raw: unknown, image?: Buffer | null): Promise<BookingReceipt> {
+const OCCUPYING = new Set(["pending", "confirmed", "rescheduled", "completed", "no_show"]);
+
+export async function createBooking(raw: unknown, image?: Buffer | null, userId?: string): Promise<BookingReceipt> {
   const parsed = bookingPayloadSchema.parse(raw);
   const phone = normalizeNamibianPhone(parsed.clientPhone);
   if (!phone) throw new AppError("phone", "Enter a Namibian number, like 081 123 4567.");
   const settings = await getSettingsRow();
-  let savedFile: string | null = null;
+  const [built, publicServices] = await Promise.all([buildLines(null, parsed.services, parsed.date), getPublicServices()]);
+  const needsImage = publicServices.some((service) => parsed.services.some((item) => item.serviceId === service.id) && service.requiresInspiration);
+  if (needsImage && !image) throw new AppError("inspiration", "Add an inspiration photo for this service.");
+  await assertSlotOpen(null, { date: parsed.date, startTime: parsed.startTime, duration: built.duration, timezone: settings.timezone, step: settings.slotIntervalMinutes, minNotice: settings.minNoticeMinutes });
+
+  const firestore = getFirebaseAdminFirestore();
+  const bookingId = randomUUID();
+  const endTime = addMinutesToTime(parsed.startTime, built.duration);
+  let imagePath: string | null = null;
+  let imageMimeType: string | null = null;
+  if (image) {
+    imageMimeType = detectImage(image);
+    if (!imageMimeType) throw new AppError("image", "Use a JPG, PNG or WEBP photo.");
+    if (image.length > 3_500_000) throw new AppError("image", "That photo is too large. Try a smaller one.");
+    imagePath = `inspiration/${bookingId}`;
+    await getFirebaseAdminStorage().file(imagePath).save(image, { resumable: false, metadata: { contentType: imageMimeType, cacheControl: "private, no-store" } });
+  }
 
   try {
-    const receipt = await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(4812, hashtext(${parsed.date}))`);
-      const built = await buildLines(tx, parsed.services, parsed.date);
-      const flags = await tx.select({ id: services.id, requiresInspiration: services.requiresInspiration }).from(services);
-      if (
-        flags.some((service) => parsed.services.some((item) => item.serviceId === service.id) && service.requiresInspiration) &&
-        !image
-      ) {
-        throw new AppError("inspiration", "Add an inspiration photo for this service.");
-      }
-      await assertSlotOpen(tx, {
-        date: parsed.date,
-        startTime: parsed.startTime,
-        duration: built.duration,
-        timezone: settings.timezone,
-        step: settings.slotIntervalMinutes,
-        minNotice: settings.minNoticeMinutes,
+    const reference = await firestore.runTransaction(async (transaction) => {
+      const query = firestore.collection("bookings").where("bookingDate", "==", parsed.date);
+      const [bookingsForDay, counter] = await Promise.all([
+        transaction.get(query),
+        transaction.get(firestore.collection("bookingCounters").doc(todayInTimeZone(settings.timezone))),
+      ]);
+      const start = timeToMinutes(parsed.startTime);
+      const end = timeToMinutes(endTime);
+      const collision = bookingsForDay.docs.some((document) => {
+        const booking = document.data() as { status?: string; startTime?: string; endTime?: string };
+        return Boolean(booking.status && OCCUPYING.has(booking.status) && booking.startTime && booking.endTime && start < timeToMinutes(booking.endTime) && end > timeToMinutes(booking.startTime));
       });
-
-      const createdOn = todayInTimeZone(settings.timezone);
-      const prefix = makeReference(createdOn, 1).slice(0, 9);
-      const existing = await tx.select({ reference: bookings.reference }).from(bookings).where(like(bookings.reference, `${prefix}%`));
-      const used = new Set(existing.map((row) => row.reference));
-      let sequence = existing.length + 1;
-      let reference = makeReference(createdOn, sequence);
-      while (used.has(reference)) {
-        sequence += 1;
-        reference = makeReference(createdOn, sequence);
-      }
-
-      const endTime = addMinutesToTime(parsed.startTime, built.duration);
-      const [booking] = await tx
-        .insert(bookings)
-        .values({
-          reference,
-          clientName: parsed.clientName.trim(),
-          clientPhone: phone,
-          bookingDate: parsed.date,
-          startTime: parsed.startTime,
-          endTime,
-          status: "pending",
-          notes: parsed.notes ? parsed.notes : null,
-          estimatedTotal: built.total,
-          depositAmount: built.deposit > 0 ? built.deposit : null,
-        })
-        .returning();
-
-      for (const [index, line] of built.snapshots.entries()) {
-        const [savedService] = await tx
-          .insert(bookingServices)
-          .values({
-            bookingId: booking.id,
-            serviceId: line.serviceId,
-            serviceName: line.serviceName,
-            categoryName: line.categoryName,
-            priceSnapshot: line.price,
-            durationMinutes: line.durationMinutes,
-            imageUrl: line.imageUrl,
-            sortOrder: index,
-          })
-          .returning();
-        if (line.addons.length) {
-          await tx.insert(bookingAddons).values(
-            line.addons.map((addon) => ({
-              bookingId: booking.id,
-              bookingServiceId: savedService.id,
-              addonId: addon.addonId,
-              addonName: addon.addonName,
-              pricingType: addon.pricingType,
-              unitPrice: addon.unitPrice,
-              quantity: addon.quantity,
-              lineTotal: addon.lineTotal,
-            })),
-          );
-        }
-      }
-
-      if (image) {
-        const saved = await saveInspiration(image);
-        savedFile = saved.fileName;
-        await tx.insert(bookingImages).values({
-          bookingId: booking.id,
-          fileName: saved.fileName,
-          mimeType: saved.mimeType,
-        });
-      }
-
-      const dateLabel = formatAppointmentDate(parsed.date, settings.timezone);
-      const names = built.lines.map((line) => line.name).join(" + ");
-      return {
-        reference,
-        clientName: parsed.clientName.trim(),
-        date: parsed.date,
-        dateLabel,
-        startTime: parsed.startTime,
-        endTime,
-        services: built.lines,
-        total: built.total,
-        deposit: built.deposit,
-        duration: built.duration,
-        currencySymbol: settings.currencySymbol,
-        location: settings.locationText,
-        businessName: settings.businessName,
-        whatsappUrl: whatsappHref(
-          settings.whatsapp,
-          `Hi Entranced Beauty, I just submitted booking ${reference} for ${names} on ${dateLabel} at ${parsed.startTime}.`,
-        ),
-      };
+      if (collision) throw new AppError("slot_taken", "That time was just booked. Please choose another available time.", 409);
+      const sequence = Number(counter.data()?.sequence ?? 0) + 1;
+      const reference = makeReference(todayInTimeZone(settings.timezone), sequence);
+      transaction.set(counter.ref, { sequence, updatedAt: FieldValue.serverTimestamp() });
+      transaction.create(firestore.collection("bookings").doc(bookingId), {
+        reference, userId: userId ?? null, clientName: parsed.clientName.trim(), clientPhone: phone,
+        bookingDate: parsed.date, startTime: parsed.startTime, endTime, status: "pending",
+        notes: parsed.notes || null, estimatedTotal: built.total, depositAmount: built.deposit > 0 ? built.deposit : null,
+        services: built.snapshots, imagePath, imageMimeType,
+        createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+      });
+      return reference;
     });
+    const dateLabel = formatAppointmentDate(parsed.date, settings.timezone);
+    const names = built.lines.map((line) => line.name).join(" + ");
+    const receipt: BookingReceipt = {
+      reference, clientName: parsed.clientName.trim(), date: parsed.date, dateLabel,
+      startTime: parsed.startTime, endTime, services: built.lines, total: built.total,
+      deposit: built.deposit, duration: built.duration, currencySymbol: settings.currencySymbol,
+      location: settings.locationText, businessName: settings.businessName,
+      whatsappUrl: whatsappHref(settings.whatsapp, `Hi Entranced Beauty, I just submitted booking ${reference} for ${names} on ${dateLabel} at ${parsed.startTime}.`),
+    };
     void notifyOwner({ title: "New booking request", body: `${receipt.clientName} · ${receipt.dateLabel} at ${receipt.startTime}`, url: "/admin" });
     return receipt;
   } catch (error) {
-    if (savedFile) {
-      await unlink(path.join(process.cwd(), "storage", "inspiration", savedFile)).catch(() => undefined);
-    }
-    if (error instanceof Error && error.name === "ZodError") {
-      throw new AppError("validation", "Check the booking details and try again.");
-    }
+    if (imagePath) await getFirebaseAdminStorage().file(imagePath).delete({ ignoreNotFound: true }).catch(() => undefined);
+    if (error instanceof Error && error.name === "ZodError") throw new AppError("validation", "Check the booking details and try again.");
     throw error;
   }
 }

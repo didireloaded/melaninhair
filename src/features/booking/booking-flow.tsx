@@ -11,8 +11,9 @@ import { DetailsStep, type DetailValues } from "./details-step";
 import { ReviewStep } from "./review-step";
 import { ScheduleStep } from "./schedule-step";
 import { ServiceStep } from "./service-step";
+import { PhoneVerificationStep } from "./phone-verification-step";
 
-type Step = "services" | "schedule" | "location" | "details" | "review" | "done";
+type Step = "services" | "schedule" | "location" | "details" | "verify" | "review" | "done";
 type BookingLocation = "studio" | "mobile";
 
 export function BookingFlow({
@@ -37,11 +38,12 @@ export function BookingFlow({
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<BookingReceipt | null>(null);
+  const [identityToken, setIdentityToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const chosen = services.filter((service) => selected.some((item) => item.serviceId === service.id));
   const needsPhoto = chosen.some((service) => service.requiresInspiration);
-  const title = step === "services" ? "Choose your service" : step === "schedule" ? "Select date & time" : step === "location" ? "Choose location" : step === "details" ? "Your details" : step === "review" ? "Booking summary" : "Booking received";
+  const title = step === "services" ? "Choose your service" : step === "schedule" ? "Select date & time" : step === "location" ? "Choose location" : step === "details" ? "Your details" : step === "verify" ? "Verify phone" : step === "review" ? "Booking summary" : "Booking received";
   const progress = step === "services" ? 0 : step === "schedule" ? 1 : step === "location" ? 2 : 3;
 
   const estimate = useMemo(() => {
@@ -65,6 +67,7 @@ export function BookingFlow({
     if (step === "schedule") setStep("services");
     else if (step === "location") setStep("schedule");
     else if (step === "details") setStep("location");
+    else if (step === "verify") setStep("details");
     else if (step === "review") setStep("details");
     else if (step === "done") router.push("/home");
     else router.back();
@@ -111,7 +114,12 @@ export function BookingFlow({
       const body = new FormData();
       body.append("payload", JSON.stringify(payload));
       if (file) body.append("inspiration", file);
-      const response = await fetch("/api/bookings", { method: "POST", body });
+      if (!identityToken) throw new Error("Verify your phone number before booking.");
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${identityToken}` },
+        body,
+      });
       const data = (await response.json()) as BookingReceipt & { message?: string; error?: string };
       if (!response.ok) {
         if (data.error === "slot_taken") setStep("schedule");
@@ -192,13 +200,25 @@ export function BookingFlow({
             }
             setDetails(next);
             setError(null);
-            setStep("review");
+            setIdentityToken(null);
+            setStep("verify");
           }}
           onFile={onFile}
           onClearFile={() => {
             setFile(null);
             setPreview(null);
           }}
+        />
+      ) : null}
+      {step === "verify" ? (
+        <PhoneVerificationStep
+          phone={details.phone}
+          onVerified={(token) => {
+            setIdentityToken(token);
+            setError(null);
+            setStep("review");
+          }}
+          onError={(message) => setError(message || null)}
         />
       ) : null}
       {step === "review" && date && time ? (
@@ -218,7 +238,6 @@ export function BookingFlow({
               Continue
             </button>
           ) : null}
-          {step === "schedule" ? null : null}
           {step === "location" ? (
             <button type="button" onClick={() => setStep("details")} className="press h-[52px] w-full rounded-[16px] bg-coral text-[16px] font-medium text-white">
               Continue

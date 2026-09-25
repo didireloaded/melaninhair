@@ -1,329 +1,127 @@
-import { and, eq, gte, inArray, lte, ne } from "drizzle-orm";
-import { db } from "@/db";
-import {
-  availabilityBlocks,
-  bookings,
-  businessBreaks,
-  businessHours,
-  services,
-  specials,
-  serviceAddons,
-  serviceCategories,
-} from "@/db/schema";
 import { AppError } from "@/lib/errors";
-import { addonLineTotal, resolveServicePrice, roundMoney } from "@/lib/booking/pricing";
+import { addonLineTotal, roundMoney } from "@/lib/booking/pricing";
 import { classifyDay, generateSlots, slotTakenByBooking } from "@/lib/booking/slots";
-import { addMinutesToTime, clock, timeToMinutes, type Interval } from "@/lib/booking/time";
+import { addMinutesToTime, timeToMinutes, type Interval } from "@/lib/booking/time";
 import { addDaysToDateString, eachDate, isValidDateString, nowMinutesInTimeZone, todayInTimeZone, weekdayFromDateString } from "@/lib/dates";
+import { allDocuments } from "@/lib/firebase/firestore-store";
 import type { DayAvailability, Quote, QuoteLine, SelectedService } from "@/types/domain";
-import { getSettingsRow } from "./public";
+import { getPublicServices, getSettingsRow, priceForDate } from "./public";
 
-const OCCUPYING = ["pending", "confirmed", "rescheduled", "completed", "no_show"] as const;
-type Database = Pick<typeof db, "select">;
+const OCCUPYING = new Set(["pending", "confirmed", "rescheduled", "completed", "no_show"]);
+type Hour = { dayOfWeek: number; isOpen: boolean; openTime: string; closeTime: string };
+type Break = { dayOfWeek: number; startTime: string; endTime: string };
+type Block = { id: string; blockDate: string; allDay: boolean; startTime: string | null; endTime: string | null };
+type Booking = { id: string; bookingDate: string; startTime: string; endTime: string; status: string };
 
-export async function getAvailability(input: {
-  from: string;
-  to: string;
-  serviceIds: string[];
-  excludeBookingId?: string;
-}): Promise<{ days: DayAvailability[]; duration: number; timezone: string }> {
+export async function getAvailability(input: { from: string; to: string; serviceIds: string[]; excludeBookingId?: string }) {
   const settings = await getSettingsRow();
-  if (!isValidDateString(input.from) || !isValidDateString(input.to) || input.from > input.to) {
-    throw new AppError("date", "Choose a valid date.");
-  }
-  if (eachDate(input.from, input.to).length > 62) {
-    throw new AppError("date", "Choose a shorter range.");
-  }
+  validateRange(input.from, input.to);
   const uniqueIds = [...new Set(input.serviceIds)];
   if (!uniqueIds.length) throw new AppError("service", "Choose a service first.");
-  const duration = await durationForServices(uniqueIds);
-  const days = await daysForRange({
-    database: db,
-    from: input.from,
-    to: input.to,
-    duration,
-    timezone: settings.timezone,
-    step: settings.slotIntervalMinutes,
-    minNotice: settings.minNoticeMinutes,
-    excludeBookingId: input.excludeBookingId,
-  });
+  const services = await getPublicServices();
+  const selected = uniqueIds.map((id) => services.find((service) => service.id === id));
+  if (selected.some((service) => !service?.bookingEnabled)) throw new AppError("service", "That service isn't available to book. Choose another.");
+  const duration = selected.reduce((sum, service) => sum + (service?.durationMinutes ?? 0), 0);
+  const days = await daysForRange({ ...input, duration, timezone: settings.timezone, step: settings.slotIntervalMinutes, minNotice: settings.minNoticeMinutes });
   return { days, duration, timezone: settings.timezone };
 }
 
-export async function getDurationAvailability(input: {
-  from: string;
-  to: string;
-  duration: number;
-  excludeBookingId?: string;
-}) {
+export async function getDurationAvailability(input: { from: string; to: string; duration: number; excludeBookingId?: string }) {
   const settings = await getSettingsRow();
-  if (!isValidDateString(input.from) || !isValidDateString(input.to) || input.from > input.to) {
-    throw new AppError("date", "Choose a valid date.");
-  }
+  validateRange(input.from, input.to);
   if (input.duration < 15 || input.duration > 600) throw new AppError("duration", "That appointment length is not valid.");
-  const days = await daysForRange({
-    database: db,
-    from: input.from,
-    to: input.to,
-    duration: input.duration,
-    timezone: settings.timezone,
-    step: settings.slotIntervalMinutes,
-    minNotice: 0,
-    excludeBookingId: input.excludeBookingId,
-  });
+  const days = await daysForRange({ ...input, timezone: settings.timezone, step: settings.slotIntervalMinutes, minNotice: 0 });
   return { days, duration: input.duration, timezone: settings.timezone };
 }
 
-export async function quoteAppointment(input: {
-  services: SelectedService[];
-  date?: string;
-  startTime?: string;
-}): Promise<Quote> {
+export async function quoteAppointment(input: { services: SelectedService[]; date?: string; startTime?: string }): Promise<Quote> {
   const settings = await getSettingsRow();
   const date = input.date && isValidDateString(input.date) ? input.date : todayInTimeZone(settings.timezone);
-  const built = await buildLines(db, input.services, date);
-  return {
-    lines: built.lines,
-    total: built.total,
-    duration: built.duration,
-    deposit: built.deposit,
-    endTime: input.startTime ? addMinutesToTime(input.startTime, built.duration) : null,
-    currencySymbol: settings.currencySymbol,
-  };
+  const built = await buildLines(null, input.services, date);
+  return { lines: built.lines, total: built.total, duration: built.duration, deposit: built.deposit, endTime: input.startTime ? addMinutesToTime(input.startTime, built.duration) : null, currencySymbol: settings.currencySymbol };
 }
 
-export async function assertSlotOpen(database: Database, input: {
-  date: string;
-  startTime: string;
-  duration: number;
-  timezone: string;
-  step: number;
-  minNotice: number;
-  excludeBookingId?: string;
-}) {
+export async function assertSlotOpen(_database: unknown, input: { date: string; startTime: string; duration: number; timezone: string; step: number; minNotice: number; excludeBookingId?: string }) {
   const today = todayInTimeZone(input.timezone);
   if (!isValidDateString(input.date)) throw new AppError("date", "Choose a valid date.");
   if (input.date < today) throw new AppError("past", "That date has passed. Choose another day.");
-  if (input.date > addDaysToDateString(today, 120)) {
-    throw new AppError("date", "That date is too far ahead. Choose a closer day.");
-  }
-  const [day] = await daysForRange({
-    database,
-    from: input.date,
-    to: input.date,
-    duration: input.duration,
-    timezone: input.timezone,
-    step: input.step,
-    minNotice: input.minNotice,
-    excludeBookingId: input.excludeBookingId,
-  });
+  if (input.date > addDaysToDateString(today, 120)) throw new AppError("date", "That date is too far ahead. Choose a closer day.");
+  const [day] = await daysForRange({ from: input.date, to: input.date, ...input });
   if (!day || day.status === "closed") throw new AppError("closed", "Entranced Beauty is closed that day.");
-  if (day.status === "blocked" || day.status === "past") {
-    throw new AppError("date", "That date isn't available. Choose another day.");
-  }
+  if (day.status === "blocked" || day.status === "past") throw new AppError("date", "That date isn't available. Choose another day.");
   if (!day.slots.includes(input.startTime)) {
-    const bookingsForDay = await occupyingIntervals(database, input.date, input.date, input.excludeBookingId);
-    if (slotTakenByBooking(input.startTime, input.duration, bookingsForDay.get(input.date) ?? [])) {
-      throw new AppError("slot_taken", "That time was just booked. Please choose another available time.", 409);
-    }
+    const bookingMap = await occupyingIntervals(input.date, input.date, input.excludeBookingId);
+    if (slotTakenByBooking(input.startTime, input.duration, bookingMap.get(input.date) ?? [])) throw new AppError("slot_taken", "That time was just booked. Please choose another available time.", 409);
     throw new AppError("unavailable", "That time isn't available. Please choose another.");
   }
 }
 
-async function durationForServices(serviceIds: string[]): Promise<number> {
-  const rows = await db.select().from(services).where(inArray(services.id, serviceIds));
-  if (rows.length !== serviceIds.length || rows.some((service) => !service.active || !service.bookingEnabled)) {
-    throw new AppError("service", "That service isn't available to book. Choose another.");
-  }
-  return rows.reduce((sum, service) => sum + service.durationMinutes, 0);
-}
-
-export async function buildLines(database: Database, selected: SelectedService[], date: string) {
-  if (selected.length < 1 || selected.length > 4) {
-    throw new AppError("service", "Choose at least one service.");
-  }
+export async function buildLines(_database: unknown, selected: SelectedService[], date: string) {
+  if (selected.length < 1 || selected.length > 4) throw new AppError("service", "Choose at least one service.");
   const ids = selected.map((item) => item.serviceId);
   if (new Set(ids).size !== ids.length) throw new AppError("service", "Choose each service once.");
-  const serviceRows = await database.select().from(services).where(inArray(services.id, ids));
-  const categoryRows = await database.select().from(serviceCategories);
-  const categories = new Map(categoryRows.map((category) => [category.id, category]));
-  const addonRows = await database.select().from(serviceAddons).where(inArray(serviceAddons.serviceId, ids));
-  const specialRows = await database.select().from(specials).where(inArray(specials.serviceId, ids));
-  const byId = new Map(serviceRows.map((service) => [service.id, service]));
-
+  const available = await getPublicServices();
   const lines: QuoteLine[] = [];
-  const snapshots: {
-    serviceId: string;
-    serviceName: string;
-    categoryName: string;
-    price: number;
-    durationMinutes: number;
-    imageUrl: string | null;
-    depositAmount: number | null;
-    addons: {
-      addonId: string;
-      addonName: string;
-      pricingType: "fixed" | "quantity";
-      unitPrice: number;
-      quantity: number;
-      lineTotal: number;
-    }[];
-  }[] = [];
-
-  for (const [index, item] of selected.entries()) {
-    const service = byId.get(item.serviceId);
-    const category = service ? categories.get(service.categoryId) : undefined;
-    if (!service || !category || !service.active || !category.active || !service.bookingEnabled) {
-      throw new AppError("service", "That service isn't available to book. Choose another.");
-    }
-    const special = specialRows.find((row) => row.serviceId === service.id) ?? null;
-    const price = resolveServicePrice(service.price, special, date);
+  const snapshots = [] as Array<{ serviceId: string; serviceName: string; categoryName: string; price: number; durationMinutes: number; imageUrl: string | null; depositAmount: number | null; addons: Array<{ addonId: string; addonName: string; pricingType: "fixed" | "quantity"; unitPrice: number; quantity: number; lineTotal: number }> }>;
+  for (const item of selected) {
+    const service = available.find((candidate) => candidate.id === item.serviceId);
+    if (!service?.bookingEnabled) throw new AppError("service", "That service isn't available to book. Choose another.");
+    const price = priceForDate(service, date);
     const addons = item.addons.map((choice) => {
-      const addon = addonRows.find((row) => row.id === choice.addonId && row.serviceId === service.id && row.active);
+      const addon = service.addons.find((candidate) => candidate.id === choice.addonId);
       if (!addon) throw new AppError("addon", "That add-on is no longer available.");
-      if (choice.quantity < 1 || choice.quantity > addon.maxQuantity) {
-        throw new AppError("addon", `Choose between 1 and ${addon.maxQuantity} for ${addon.name}.`);
-      }
+      if (choice.quantity < 1 || choice.quantity > addon.maxQuantity) throw new AppError("addon", `Choose between 1 and ${addon.maxQuantity} for ${addon.name}.`);
       const quantity = addon.pricingType === "quantity" ? choice.quantity : 1;
-      return {
-        addonId: addon.id,
-        addonName: addon.name,
-        pricingType: addon.pricingType,
-        unitPrice: addon.price,
-        quantity,
-        lineTotal: addonLineTotal(addon.pricingType, addon.price, quantity),
-      };
+      return { addonId: addon.id, addonName: addon.name, pricingType: addon.pricingType, unitPrice: addon.price, quantity, lineTotal: addonLineTotal(addon.pricingType, addon.price, quantity) };
     });
-    lines.push({
-      serviceId: service.id,
-      name: service.name,
-      price,
-      durationMinutes: service.durationMinutes,
-      imageUrl: service.imageUrl,
-      addons: addons.map((addon) => ({ name: addon.addonName, quantity: addon.quantity, lineTotal: addon.lineTotal })),
-    });
-    snapshots.push({
-      serviceId: service.id,
-      serviceName: service.name,
-      categoryName: category.name,
-      price,
-      durationMinutes: service.durationMinutes,
-      imageUrl: service.imageUrl,
-      depositAmount: service.depositAmount,
-      addons,
-    });
-    void index;
+    lines.push({ serviceId: service.id, name: service.name, price, durationMinutes: service.durationMinutes, imageUrl: service.imageUrl, addons: addons.map((addon) => ({ name: addon.addonName, quantity: addon.quantity, lineTotal: addon.lineTotal })) });
+    snapshots.push({ serviceId: service.id, serviceName: service.name, categoryName: service.categoryName, price, durationMinutes: service.durationMinutes, imageUrl: service.imageUrl, depositAmount: service.depositAmount, addons });
   }
-
-  const total = roundMoney(
-    snapshots.reduce((sum, line) => sum + line.price + line.addons.reduce((addonSum, addon) => addonSum + addon.lineTotal, 0), 0),
-  );
+  const total = roundMoney(snapshots.reduce((sum, line) => sum + line.price + line.addons.reduce((addonSum, addon) => addonSum + addon.lineTotal, 0), 0));
   const duration = snapshots.reduce((sum, line) => sum + line.durationMinutes, 0);
-  const deposit = Math.min(
-    total,
-    roundMoney(snapshots.reduce((sum, line) => sum + (line.depositAmount ?? 0), 0)),
-  );
+  const deposit = Math.min(total, roundMoney(snapshots.reduce((sum, line) => sum + (line.depositAmount ?? 0), 0)));
   return { lines, snapshots, total, duration, deposit };
 }
 
-async function daysForRange(input: {
-  database: Database;
-  from: string;
-  to: string;
-  duration: number;
-  timezone: string;
-  step: number;
-  minNotice: number;
-  excludeBookingId?: string;
-  now?: Date;
-}): Promise<DayAvailability[]> {
+function validateRange(from: string, to: string) {
+  if (!isValidDateString(from) || !isValidDateString(to) || from > to) throw new AppError("date", "Choose a valid date.");
+  if (eachDate(from, to).length > 62) throw new AppError("date", "Choose a shorter range.");
+}
+
+async function daysForRange(input: { from: string; to: string; duration: number; timezone: string; step: number; minNotice: number; excludeBookingId?: string; now?: Date }): Promise<DayAvailability[]> {
   const today = todayInTimeZone(input.timezone, input.now);
   const nowMinutes = nowMinutesInTimeZone(input.timezone, input.now);
-  const hours = await input.database.select().from(businessHours);
-  const breaks = await input.database.select().from(businessBreaks);
-  const blocks = await input.database
-    .select()
-    .from(availabilityBlocks)
-    .where(and(gte(availabilityBlocks.blockDate, input.from), lte(availabilityBlocks.blockDate, input.to)));
-  const bookingMap = await occupyingIntervals(input.database, input.from, input.to, input.excludeBookingId);
+  const [hours, breaks, blocks, bookingMap] = await Promise.all([allDocuments<Hour>("businessHours"), allDocuments<Break>("businessBreaks"), allDocuments<Block>("availabilityBlocks"), occupyingIntervals(input.from, input.to, input.excludeBookingId)]);
   const hourMap = new Map(hours.map((hour) => [hour.dayOfWeek, hour]));
-
   return eachDate(input.from, input.to).map((date) => {
     const weekday = weekdayFromDateString(date);
     const hour = hourMap.get(weekday);
-    const dayBreaks: Interval[] = breaks
-      .filter((item) => item.dayOfWeek === weekday)
-      .map((item) => ({ start: timeToMinutes(item.startTime), end: timeToMinutes(item.endTime) }));
+    const dayBreaks: Interval[] = breaks.filter((item) => item.dayOfWeek === weekday).map((item) => ({ start: timeToMinutes(item.startTime), end: timeToMinutes(item.endTime) }));
     const dayBlocks = blocks.filter((block) => block.blockDate === date);
     const allDayBlocked = dayBlocks.some((block) => block.allDay || !block.startTime || !block.endTime);
-    const blockIntervals: Interval[] = dayBlocks
-      .filter((block) => !block.allDay && block.startTime && block.endTime)
-      .map((block) => ({ start: timeToMinutes(block.startTime!), end: timeToMinutes(block.endTime!) }));
+    const blockIntervals: Interval[] = dayBlocks.filter((block) => !block.allDay && block.startTime && block.endTime).map((block) => ({ start: timeToMinutes(block.startTime!), end: timeToMinutes(block.endTime!) }));
     const isOpen = Boolean(hour?.isOpen);
-    const slots =
-      date < today || !isOpen || allDayBlocked || !hour
-        ? []
-        : generateSlots({
-            openTime: clock(hour.openTime),
-            closeTime: clock(hour.closeTime),
-            durationMinutes: input.duration,
-            stepMinutes: input.step,
-            breaks: dayBreaks,
-            blocks: blockIntervals,
-            bookings: bookingMap.get(date) ?? [],
-            earliestStart: date === today ? nowMinutes + input.minNotice : null,
-          });
-    return {
-      date,
-      weekday,
-      status: classifyDay({ date, today, isOpen, allDayBlocked, slots }),
-      slots,
-    };
+    const slots = date < today || !isOpen || allDayBlocked || !hour ? [] : generateSlots({ openTime: hour.openTime, closeTime: hour.closeTime, durationMinutes: input.duration, stepMinutes: input.step, breaks: dayBreaks, blocks: blockIntervals, bookings: bookingMap.get(date) ?? [], earliestStart: date === today ? nowMinutes + input.minNotice : null });
+    return { date, weekday, status: classifyDay({ date, today, isOpen, allDayBlocked, slots }), slots };
   });
 }
 
-async function occupyingIntervals(database: Database, from: string, to: string, excludeBookingId?: string) {
-  const filters = [
-    gte(bookings.bookingDate, from),
-    lte(bookings.bookingDate, to),
-    inArray(bookings.status, [...OCCUPYING]),
-  ];
-  if (excludeBookingId) filters.push(ne(bookings.id, excludeBookingId));
-  const rows = await database
-    .select({
-      date: bookings.bookingDate,
-      startTime: bookings.startTime,
-      endTime: bookings.endTime,
-    })
-    .from(bookings)
-    .where(and(...filters));
+async function occupyingIntervals(from: string, to: string, excludeBookingId?: string) {
+  const rows = await allDocuments<Booking>("bookings");
   const map = new Map<string, Interval[]>();
-  for (const row of rows) {
-    const list = map.get(row.date) ?? [];
+  rows.filter((row) => row.bookingDate >= from && row.bookingDate <= to && OCCUPYING.has(row.status) && row.id !== excludeBookingId).forEach((row) => {
+    const list = map.get(row.bookingDate) ?? [];
     list.push({ start: timeToMinutes(row.startTime), end: timeToMinutes(row.endTime) });
-    map.set(row.date, list);
-  }
+    map.set(row.bookingDate, list);
+  });
   return map;
 }
 
 export async function upcomingOpenDays(limit = 4) {
   const settings = await getSettingsRow();
   const today = todayInTimeZone(settings.timezone);
-  const from = today;
-  const to = addDaysToDateString(today, 13);
-  const shortest = await db
-    .select({ duration: services.durationMinutes })
-    .from(services)
-    .where(and(eq(services.active, true), eq(services.bookingEnabled, true)));
-  const duration = shortest.length ? Math.min(...shortest.map((row) => row.duration)) : 45;
-  const days = await daysForRange({
-    database: db,
-    from,
-    to,
-    duration,
-    timezone: settings.timezone,
-    step: settings.slotIntervalMinutes,
-    minNotice: settings.minNoticeMinutes,
-  });
+  const services = (await getPublicServices()).filter((service) => service.bookingEnabled);
+  const duration = services.length ? Math.min(...services.map((service) => service.durationMinutes)) : 45;
+  const days = await daysForRange({ from: today, to: addDaysToDateString(today, 13), duration, timezone: settings.timezone, step: settings.slotIntervalMinutes, minNotice: settings.minNoticeMinutes });
   return days.filter((day) => day.status === "available").slice(0, limit);
 }

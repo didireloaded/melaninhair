@@ -6,7 +6,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "firebase:seed": "tsx scripts/seed-firestore.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
