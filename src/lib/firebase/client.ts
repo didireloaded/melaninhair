@@ -17,7 +17,7 @@ const firebaseConfig = {
 
 export const firebaseApp = getApps()[0] ?? initializeApp(firebaseConfig);
 export const firebaseAuth = getAuth(firebaseApp);
-export const firestore = getFirestore(firebaseApp);
+export const firestore = getFirestore(firebaseApp, "entranced-beauty");
 
 export async function startFirebaseAnalytics() {
   if (await isSupported()) return getAnalytics(firebaseApp);

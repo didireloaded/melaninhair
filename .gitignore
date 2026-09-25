@@ -23,3 +23,5 @@
 # Local env files
 .env*.local
 .env
+.vercel
+.firestore-analysis.md

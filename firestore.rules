@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+// Public catalogue: businessSettings, serviceCategories, services,
+// serviceAddons, businessHours, businessBreaks, portfolioItems, specials.
+// Private operations: bookings, availabilityBlocks, pushSubscriptions,
+// admins. Booking documents contain customer names and phone numbers.
+//
+// The Next.js server is the only Firestore caller. It uses Firebase Admin,
+// validates payloads with the application's Zod schemas, and is not governed
+// by client Security Rules. Browser clients have no direct database access.
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function uidUnchanged(data) {
+      return !('uid' in data) || (isAuthenticated() && data.uid == request.auth.uid);
+    }
+
+    function uidNotModified() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid']);
+    }
+
+    function isValidServerDocument(data) {
+      return data is map && data.keys().size() <= 64;
+    }
+
+    match /{document=**} {
+      allow read: if false;
+      allow create, update: if false && isValidServerDocument(request.resource.data);
+      allow delete: if false;
+    }
+  }
+}

@@ -13,4 +13,4 @@ function getAdminApp() {
 }
 
 export function getFirebaseAdminAuth() { return getAuth(getAdminApp()); }
-export function getFirebaseAdminFirestore() { return getFirestore(getAdminApp()); }
+export function getFirebaseAdminFirestore() { return getFirestore(getAdminApp(), "entranced-beauty"); }
