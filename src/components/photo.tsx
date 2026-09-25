@@ -22,7 +22,7 @@ export function Photo({
         src={src}
         alt=""
         fill
-        priority={priority}
+        preload={priority}
         sizes={sizes}
         className={className}
         unoptimized={src.startsWith("/api/")}
