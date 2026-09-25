@@ -1,5 +1,3 @@
-"use client";
-
 import Image from "next/image";
 
 export function Photo({
@@ -26,9 +24,8 @@ export function Photo({
         fill
         priority={priority}
         sizes={sizes}
-        className={`${className} opacity-0 transition-opacity [&.loaded]:opacity-100`}
+        className={className}
         unoptimized={src.startsWith("/api/")}
-        onLoad={(event) => event.currentTarget.classList.add("loaded")}
       />
     </div>
   );

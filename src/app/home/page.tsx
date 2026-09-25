@@ -59,13 +59,13 @@ export default async function HomePage() {
             </Link>
           </div>
           <div className="-mx-5 flex gap-2.5 overflow-x-auto px-5 pb-1">
-            {popular.map((service) => {
+            {popular.map((service, index) => {
               const live = service.special ? specialApplies({ active: true, ...service.special }, today) : false;
               const price = live && service.special ? service.special.price : service.price;
               return (
                 <article key={service.id} className="w-[82px] shrink-0 text-center">
                   <Link href={`/services/${service.slug}`} className="relative mx-auto grid h-[68px] w-[68px] place-items-center overflow-hidden rounded-[22px] bg-[#eeeef9] text-2xl text-[#3f3048]">
-                    {service.imageUrl ? <Photo src={service.imageUrl} alt="" sizes="48px" /> : null}
+                    {service.imageUrl ? <Photo src={service.imageUrl} alt="" sizes="68px" priority={index === 0} /> : null}
                     <span className="relative z-10">{service.categoryName === "Makeup" ? "✦" : service.categoryName === "Hair" ? "⌁" : "✧"}</span>
                   </Link>
                   <h3 className="mt-2 line-clamp-2 text-[12px] font-medium leading-[1.15]">{service.categoryName}</h3>
