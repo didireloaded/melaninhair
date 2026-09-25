@@ -23,6 +23,7 @@ export function Photo({
         alt=""
         fill
         preload={priority}
+        fetchPriority={priority ? "high" : undefined}
         sizes={sizes}
         className={className}
         unoptimized={src.startsWith("/api/")}
